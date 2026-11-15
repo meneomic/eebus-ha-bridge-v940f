@@ -1,7 +1,5 @@
-# Makes this repository installable as a Home Assistant add-on repository, in
-# addition to being a HACS custom repository for custom_components/eebus. The
-# Supervisor reads this file at the repository root; HACS ignores it, and the
-# two discovery mechanisms never look at the same paths.
-name: EEBUS Bridge Add-ons
-url: https://github.com/volschin/eebus-ha-bridge
-maintainer: volschin <veit@olschinski.de>
+# Experimental branch repository. Different URL/branch => different Supervisor
+# repository identity; original volschin app remains independent.
+name: EEBUS Bridge — Vaillant Preview (experimental)
+url: https://github.com/meneomic/eebus-ha-bridge-v940f
+maintainer: meneomic
