@@ -1,13 +1,40 @@
 configuration:
+  grpc_port:
+    name: Port gRPC
+    description: Port de l'API gRPC. Utiliser le même port dans l'intégration EEBUS.
+  eebus_port:
+    name: Port EEBUS
+    description: Port du protocole SHIP utilisé par la passerelle Vaillant.
+  vendor:
+    name: Fabricant
+    description: Nom du fabricant annoncé sur EEBUS.
+  brand:
+    name: Marque
+    description: Marque annoncée sur EEBUS et affichée dans l'application Vaillant.
+  model:
+    name: Modèle
+    description: Modèle annoncé sur EEBUS.
+  serial:
+    name: Numéro de série
+    description: >-
+      Numéro de série annoncé via EEBUS. Laisser vide pour conserver celui
+      généré lors de la première exécution. Le modifier peut imposer un
+      nouvel appairage avec Vaillant.
+  experimental_mgcp_provider:
+    name: "Expérimental : fournisseur MGCP"
+    description: >-
+      Fournit les mesures du point de raccordement au réseau pour la gestion
+      de l'énergie solaire par la pompe à chaleur. Nécessite un paramétrage
+      spécifique dans myVAILLANT. Désactivé par défaut.
   debug_events:
     name: "Diagnostic : découverte SPINE"
     description: >-
       Journalise les entités, fonctions et permissions de lecture/écriture
       annoncées ([DISCOVERY]), ainsi que les événements de débogage.
-      Désactivé par défaut. Masquer les identifiants avant de partager les journaux.
+      Désactivé par défaut. Masquer les identifiants avant tout partage.
   ship_log:
     name: "Diagnostic : connexion SHIP"
     description: >-
-      Journalise les étapes de connexion, de déconnexion et les erreurs SHIP
-      afin d'analyser les reconnexions. Désactivé par défaut.
+      Journalise la connexion, la déconnexion et les erreurs SHIP afin
+      d'analyser les reconnexions. Désactivé par défaut.
       Vérifier les identifiants dans les journaux avant partage.
