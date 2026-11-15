@@ -24,3 +24,15 @@ configuration:
     name: "Experimentell: MGCP-Netzsignal"
     description: >-
       Stellt den experimentellen MGCP-Grid-Provider bereit, damit die Wärmepumpe die Bilanz am Hausanschluss lesen und ihr eigenes PV-Überschuss-Energiemanagement ausführen kann. Erfordert das Commissioning in der Wärmepumpen-App (siehe README). Standardmäßig aus.
+  debug_events:
+    name: "Diagnose: SPINE-Discovery"
+    description: >-
+      Protokolliert entdeckte Entitaeten, Funktionen und Lese-/Schreibrechte
+      ([DISCOVERY]) sowie Debug-Ereignisse. Standardmaessig deaktiviert.
+      Protokolle vor dem Teilen auf Kennungen pruefen.
+  ship_log:
+    name: "Diagnose: SHIP-Verbindung"
+    description: >-
+      Protokolliert SHIP-Handshake- und Trennungsereignisse zur Untersuchung
+      von Verbindungsproblemen. Standardmaessig deaktiviert.
+      Protokolle vor dem Teilen pruefen.
