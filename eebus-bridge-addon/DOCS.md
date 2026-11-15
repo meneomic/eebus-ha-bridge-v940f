@@ -60,6 +60,29 @@ device that has to be paired again.
 
 ## Vaillant local capability inventory (optional, read-only)
 
+**Deployment restriction (important):** The diagnostic options added in this
+fork's feature branch are **not available in the installed upstream add-on
+v0.18.0**. Merely editing GitHub files does not change a running add-on.
+Installing this fork as a second add-on creates a **separate add-on identity
+and /data storage**, so its SKI/certificate would differ and the two daemons
+would conflict on the host-network SHIP/gRPC ports. Do not install a second
+instance or uninstall the existing one. A controlled, backed-up migration
+that retains certificate + serial identity must be prepared and tested
+separately before the settings below can be used on the production system.
+
+For an already collected log containing [DISCOVERY] lines, the independent
+offline script at `scripts/spine_inventory.py` can create a redacted
+read/write function inventory without needing any access to the boiler:
+
+```bash
+python3 scripts/spine_inventory.py bridge.log --output spine-report.md
+python3 scripts/spine_inventory.py bridge.log --format json --output spine-report.json
+```
+
+The current production log without discovery debug events cannot be
+used to reconstruct functions not captured in it. The tool will report
+that no useful inventory was found instead of guessing.
+
 The bridge already has a [DISCOVERY] function inventory in
 `eebus-bridge/internal/eebus/discovery.go`. On Vaillant VR 940f installations
 (including boilers with a VRC 720), enable **Diagnostics: SPINE discovery**
