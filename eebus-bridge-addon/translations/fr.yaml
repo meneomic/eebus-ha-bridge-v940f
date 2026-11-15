@@ -1,0 +1,13 @@
+configuration:
+  debug_events:
+    name: "Diagnostic : découverte SPINE"
+    description: >-
+      Journalise les entités, fonctions et permissions de lecture/écriture
+      annoncées ([DISCOVERY]), ainsi que les événements de débogage.
+      Désactivé par défaut. Masquer les identifiants avant de partager les journaux.
+  ship_log:
+    name: "Diagnostic : connexion SHIP"
+    description: >-
+      Journalise les étapes de connexion, de déconnexion et les erreurs SHIP
+      afin d'analyser les reconnexions. Désactivé par défaut.
+      Vérifier les identifiants dans les journaux avant partage.
