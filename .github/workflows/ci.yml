@@ -97,6 +97,8 @@ jobs:
         run: python3 -m unittest scripts.tests.test_check_addon_version -v
       - name: Check add-on version matches the integration
         run: python3 scripts/check_addon_version.py
+      - name: Test offline SPINE inventory parser
+        run: python3 -m unittest scripts.tests.test_spine_inventory -v
 
   go:
     needs: changes
