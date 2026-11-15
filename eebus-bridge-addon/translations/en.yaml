@@ -23,3 +23,14 @@ configuration:
     name: "Experimental: MGCP grid provider"
     description: >-
       Expose the experimental MGCP grid-connection-point provider so the heat pump can read the household balance and run its own PV-surplus energy management. Requires commissioning in the heat pump app (see README). Off by default.
+  debug_events:
+    name: "Diagnostics: SPINE discovery"
+    description: >-
+      Log the remote device's discovered entities, feature functions and advertised
+      read/write permissions ([DISCOVERY]) plus bridge debug events. Disabled by
+      default. Review identifiers before sharing logs.
+  ship_log:
+    name: "Diagnostics: SHIP connection"
+    description: >-
+      Log SHIP handshake and disconnect details to investigate connection
+      recovery. Disabled by default. May expose device identifiers in logs.
