@@ -35,6 +35,9 @@ options:
   model: eebus-bridge
   serial: ""
   experimental_mgcp_provider: false
+  # Opt-in diagnosis: do not change device identity or enable any commands.
+  debug_events: false
+  ship_log: false
 schema:
   grpc_port: port
   eebus_port: port
@@ -46,3 +49,7 @@ schema:
   # Optional: exposes the experimental MGCP grid-connection-point provider
   # (README, "Kooperatives Netzsignal"). Off unless explicitly enabled.
   experimental_mgcp_provider: bool?
+  # Detailed SPINE discovery/function permissions; off by default.
+  debug_events: bool?
+  # SHIP handshake/abort messages; off by default.
+  ship_log: bool?
