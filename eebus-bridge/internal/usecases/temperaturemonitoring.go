@@ -127,6 +127,9 @@ func (w *TemperatureMonitoringWrapper) HandleEvent(
 ) {
 	if w.debug {
 		log.Printf("[DEBUG] EEBUS %s event received: ski=%s event=%s", w.logLabel, eebus.ShortSKI(ski), event)
+		// Heating/temperature callbacks are present on Vaillant ecoTEC even when
+		// Monitoring of Power Consumption (MPC) is not advertised.
+		eebus.DefaultUseCaseDiscovery().LogOnce(ski, device)
 	}
 	if w.registry != nil {
 		w.registry.UpsertObservation(ski, device, entity, w.registryTag)
