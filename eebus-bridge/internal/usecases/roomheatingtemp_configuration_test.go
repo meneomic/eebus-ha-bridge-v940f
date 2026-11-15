@@ -179,6 +179,10 @@ func TestCRHTConfigurationFacadeRecordsObservationsAndIgnoresUnknownEvents(t *te
 	registry := eebus.NewDeviceRegistry()
 	device := spinemocks.NewDeviceRemoteInterface(t)
 	device.EXPECT().Ski().Return("ab:cd").Maybe()
+	// Debug-enabled CRHT callbacks now capture the remote inventory.
+	device.EXPECT().DeviceType().Return((*model.DeviceTypeType)(nil)).Maybe()
+	device.EXPECT().Entities().Return([]spineapi.EntityRemoteInterface(nil)).Maybe()
+	device.EXPECT().UseCases().Return([]model.UseCaseInformationDataType(nil)).Maybe()
 	entity := spinemocks.NewEntityRemoteInterface(t)
 	entity.EXPECT().Device().Return(device).Maybe()
 	entity.EXPECT().Address().Return(&model.EntityAddressType{}).Maybe()
