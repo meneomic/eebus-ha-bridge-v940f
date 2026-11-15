@@ -36,6 +36,24 @@ Home Assistant                    eebus-bridge (Go)         Vaillant VR940f
 +----------------+            +------------------+          +--------------+
 ```
 
+## Fork-Forschung: Vaillant ecoTEC / VRC 720
+
+Dieser Fork untersucht die **tatsächlich** über EEBUS verfügbaren Messwerte und
+Befehle einer ecoTEC-Gasheizung mit sensoCOMFORT VRC 720 und VR 940f.
+Die verifizierten Beobachtungen sind in
+[`docs/ecotec-vrc720-observed-2026-11-15.md`](docs/ecotec-vrc720-observed-2026-11-15.md)
+dokumentiert. Ein offline nutzbarer
+[`[DISCOVERY]`-Inventar-Parser](scripts/spine_inventory.py) erstellt aus
+Debug-Logs einen datensparsamen Markdown- oder JSON-Bericht.
+
+**Noch nicht produktionsreif:** Neue Diagnoseoptionen sind nur im Branch
+`feat/vaillant-discovery-diagnostics` enthalten; der installierte
+Upstream-Add-on wird dadurch nicht verändert. Keine zweite Bridge parallel
+starten oder den bestehenden Add-on deinstallieren: Ein anderes
+Zertifikat/SKI oder konkurrierende SHIP-Ports können die Kopplung stören.
+Die SPINE-Funktionsrechte sind lediglich annoncierte Fähigkeiten, kein
+Nachweis ausgelesener Werte oder erfolgreich ausgeführter Befehle.
+
 ## Installation
 
 Ab Version **0.18.0** benötigt die Integration Home Assistant **2026.11.0 oder neuer**.
