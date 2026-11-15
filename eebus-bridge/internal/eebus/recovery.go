@@ -182,7 +182,7 @@ func (s *RecoverySupervisor) reconcileHealthy(now time.Time, device DeviceHealth
 	}
 	if record == nil {
 		state := RecoveryStateGracePeriod
-		if device.MonitoringSuccessOnConnect {
+		if device.MonitoringNotRequired || device.MonitoringSuccessOnConnect {
 			state = RecoveryStateHealthy
 		}
 		record = s.recordLocked(ski, now)
@@ -199,7 +199,7 @@ func (s *RecoverySupervisor) reconcileHealthy(now time.Time, device DeviceHealth
 	s.mu.Unlock()
 
 	monitoringRecovered := !lastAttempt.IsZero() && s.registry.MonitoringSuccessSince(ski, lastAttempt)
-	if monitoringRecovered || (lastAttempt.IsZero() && device.MonitoringSuccessOnConnect) {
+	if device.MonitoringNotRequired || monitoringRecovered || (lastAttempt.IsZero() && device.MonitoringSuccessOnConnect) {
 		s.mu.Lock()
 		record = s.recordLocked(ski, now)
 		record.Attempts = 0
@@ -288,7 +288,7 @@ func (s *RecoverySupervisor) Snapshot(ski string, now time.Time) RecoverySnapsho
 		return RecoverySnapshot{State: RecoveryStateDisconnected, LastTransitionAt: health.LastTransitionAt}
 	}
 	state := RecoveryStateGracePeriod
-	if health.MonitoringSuccessOnConnect {
+	if health.MonitoringNotRequired || health.MonitoringSuccessOnConnect {
 		state = RecoveryStateHealthy
 	}
 	return RecoverySnapshot{State: state, LastTransitionAt: health.LastTransitionAt}
