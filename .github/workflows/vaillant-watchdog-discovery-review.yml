@@ -30,7 +30,7 @@ jobs:
       - name: Check gofmt
         run: |
           files="$(gofmt -l internal/eebus/registry.go internal/eebus/capabilities.go internal/eebus/recovery.go internal/eebus/monitoring_applicability_test.go)"
-          if [ -n "$files" ]; then echo "$files"; exit 1; fi
+          if [ -n "$files" ]; then echo "$files"; gofmt -d internal/eebus/registry.go; exit 1; fi
       - name: Go vet
         run: go vet ./internal/eebus/...
       - name: Unit and race tests
