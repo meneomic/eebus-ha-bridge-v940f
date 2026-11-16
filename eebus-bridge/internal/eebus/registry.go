@@ -74,7 +74,7 @@ type deviceCatalogStore struct {
 type deviceHealthStore struct {
 	mu                sync.RWMutex
 	monitoring        map[string]deviceMonitoringState
-	heartbeatRequired map[string]bool
+	heartbeatRequired   map[string]bool
 	monitoringAdvertised map[string]bool
 }
 
@@ -144,7 +144,7 @@ func NewDeviceRegistryWithClock(clock Clock) *DeviceRegistry {
 		catalog: deviceCatalogStore{devices: make(map[string]DeviceInfo)},
 		health: deviceHealthStore{
 			monitoring:        make(map[string]deviceMonitoringState),
-			heartbeatRequired: make(map[string]bool),
+			heartbeatRequired:   make(map[string]bool),
 			monitoringAdvertised: make(map[string]bool),
 		},
 		capabilities: deviceCapabilityStore{

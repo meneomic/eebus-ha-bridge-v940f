@@ -191,3 +191,25 @@ type countingRecoveryController struct { registers int }
 
 func (c *countingRecoveryController) RegisterRemoteSKI(string) { c.registers++ }
 func (c *countingRecoveryController) UnregisterRemoteSKI(string) {}
+
+func TestMonitoringAdvertisedAfterInitialDiscoveryGraceForcesImmediateRecovery(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 11, 16, 13, 53, 0, 0, time.UTC)}
+	registry := eebus.NewDeviceRegistryWithClock(clock)
+	registry.MarkConnected("AA11")
+	controller := &countingRecoveryController{}
+	supervisor := eebus.NewRecoverySupervisor(registry, controller, eebus.RecoveryConfig{
+		StaleThreshold: 10 * time.Minute, GracePeriod: 2 * time.Minute,
+		BaseBackoff: 2 * time.Minute, MaxBackoff: 8 * time.Minute, MaxAttempts: 3,
+	})
+	supervisor.Tick(clock.now)
+	clock.now = clock.now.Add(3 * time.Minute)
+	supervisor.Tick(clock.now)
+	if controller.registers != 0 {
+		t.Fatal("unknown discovery should not recover prematurely")
+	}
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityMonitoring, true)
+	supervisor.Tick(clock.now)
+	if controller.registers != 1 {
+		t.Fatal("MPC advertisement must end the discovery exemption immediately")
+	}
+}
