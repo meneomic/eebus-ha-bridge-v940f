@@ -420,7 +420,7 @@ func (r *DeviceRegistry) deviceHealthSnapshot(ski string, state deviceMonitoring
 		LastTransitionAt:           state.lastTransitionAt,
 		LastMonitoringSuccess:      state.lastMonitoringSuccess,
 		MonitoringSuccessOnConnect: state.monitoringSuccessOnConnect && heartbeatOnConnection(state),
-		MonitoringNotRequired:       r.monitoringNotRequired(ski, state.heartbeatRequired),
+		MonitoringNotRequired:      r.monitoringNotRequired(ski, state.heartbeatRequired),
 		MonitoringDiscoveryPending: !state.monitoringAdvertised &&
 			!state.heartbeatRequired && !state.monitoringSuccessOnConnect &&
 			!r.monitoringNotRequired(ski, state.heartbeatRequired),
