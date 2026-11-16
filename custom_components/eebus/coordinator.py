@@ -272,6 +272,19 @@ class EebusCoordinator(DataUpdateCoordinator[DeviceState]):
                 _LOGGER.info("EEBUS bridge connection restored at %s:%s", self.host, self.port)
             return state
         except grpc.aio.AioRpcError as err:
+            if err.code() == grpc.StatusCode.NOT_FOUND:
+                # The bridge is reachable; the remote EEBUS device may still
+                # be discovered after an add-on restart. Keep the shared
+                # channel and its event streams alive, and preserve the
+                # poller's NOT_FOUND streak for bounded re-registration.
+                _LOGGER.debug(
+                    "EEBUS remote device not yet available at %s:%s: %s",
+                    self.host,
+                    self.port,
+                    err.details(),
+                )
+                raise UpdateFailed("EEBUS remote device not yet available") from err
+
             await self._channel_manager.invalidate()
             self._poller.reset_after_transport_error(err.code())
             if err.code() == grpc.StatusCode.UNAUTHENTICATED:

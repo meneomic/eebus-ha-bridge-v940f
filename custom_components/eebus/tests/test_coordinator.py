@@ -1635,3 +1635,62 @@ def test_zone_label_survives_a_later_event_without_one() -> None:
         )
     )
     assert reduced.hvac.zone_label == "Zone 1"
+
+
+async def test_not_found_poll_does_not_invalidate_shared_channel_or_bridge() -> None:
+    """A missing remote device is not a transport outage or a reason to drop streams."""
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    coordinator = EebusCoordinator.__new__(EebusCoordinator)
+    coordinator.host = "localhost"
+    coordinator.port = 50051
+    coordinator._runtime = MagicMock()
+    coordinator._channel_manager = MagicMock()
+    coordinator._channel_manager.invalidate = AsyncMock()
+    coordinator._poller = MagicMock()
+    coordinator._poller.poll = AsyncMock(
+        side_effect=AioRpcError(
+            grpc.StatusCode.NOT_FOUND,
+            Metadata(),
+            Metadata(),
+            details="device not found for specified ski",
+        )
+    )
+
+    with pytest.raises(UpdateFailed, match="remote device not yet available"):
+        await coordinator._async_update_data()
+
+    coordinator._channel_manager.invalidate.assert_not_awaited()
+    coordinator._poller.reset_after_transport_error.assert_not_called()
+    coordinator._runtime.mark_unavailable.assert_not_called()
+
+
+async def test_unavailable_poll_still_invalidates_transport_channel() -> None:
+    """A true transport failure must retain the existing reconnect behavior."""
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    coordinator = EebusCoordinator.__new__(EebusCoordinator)
+    coordinator.host = "localhost"
+    coordinator.port = 50051
+    coordinator._runtime = MagicMock()
+    coordinator._runtime.mark_unavailable.return_value = False
+    coordinator._channel_manager = MagicMock()
+    coordinator._channel_manager.invalidate = AsyncMock()
+    coordinator._poller = MagicMock()
+    coordinator._poller.poll = AsyncMock(
+        side_effect=AioRpcError(
+            grpc.StatusCode.UNAVAILABLE,
+            Metadata(),
+            Metadata(),
+            details="transport unavailable",
+        )
+    )
+
+    with pytest.raises(UpdateFailed, match="gRPC error"):
+        await coordinator._async_update_data()
+
+    coordinator._channel_manager.invalidate.assert_awaited_once_with()
+    coordinator._poller.reset_after_transport_error.assert_called_once_with(
+        grpc.StatusCode.UNAVAILABLE
+    )
+    coordinator._runtime.mark_unavailable.assert_called_once_with()
