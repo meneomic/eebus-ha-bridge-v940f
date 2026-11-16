@@ -62,3 +62,43 @@ remain installed throughout testing. The preview app cannot share its `/data`.
 
 The backed-up identity is sufficient for a restoration attempt, but an exact
 SKI match and successful reconnection must be verified on live hardware.
+
+## Preview 0.18.1 — signed heating-triggered SPINE discovery
+
+- Candidate source commit: `be6bf5b48303ea3d2fa3437ef6c0a65e6a9bc6a0`.
+- Pinned and verified OCI image: `ghcr.io/meneomic/eebus-bridge@sha256:c52fcc0615408ef5fe00da7f0fd0ae3653b60f28f848434e3b6ba397cec6e2e8`.
+- Functional difference from Preview 0.18.0: when `debug_events: true`, the
+  device's remote SPINE entities, features, function permissions and use cases
+  are logged on **CRHT, MRHSF, MRT, MOT and MDT** events as well as MPC events.
+  Previously the only discovery hook was MPC, which Vaillant ecoTEC does not
+  advertise. No new control commands are sent to the heating system.
+- The previously validated watchdog behavior is unchanged.
+- Home Assistant integration remains at API version 0.18.0; **0.18.1 is the
+  version of the separate experimental add-on only**.
+
+### Safe in-place update after the existing preview is stable
+
+1. Keep the old independent add-on `aa6fc4a7_eebus_bridge` installed but
+   stopped, with its autostart off. Keep the verified backup `fc0c9905`
+   (and the QNAP copy). Prefer a new partial Home Assistant backup containing
+   the currently running Preview before updating it.
+2. Refresh the custom app repository in Home Assistant. Confirm an update to
+   **EEBUS Bridge Vaillant Preview 0.18.1** is offered. Do not update the
+   unpatched original add-on by mistake.
+3. Set `debug_events: true` and `ship_log: false`, then update only the Preview
+   app. An app update may restart the bridge; a brief SHIP reconnect is expected.
+4. Confirm the local SKI remains `…173DA7` and the remote SKI `…7604ED`.
+   Wait for new CRHT/MRT/MOT callbacks, then collect:
+
+   ```bash
+   ha apps logs e9c1c275_eebus_bridge_vaillant_preview | grep -F '[DISCOVERY]'
+   ```
+
+5. Disable `debug_events` after collecting. Recheck `DEVICE_READINESS_READY`,
+   `monitoring=unsupported`, `room_heating=available`,
+   `recovery.attempts=0` and a running gRPC device stream.
+6. If the new version cannot connect, stop the Preview immediately and
+   restart the original add-on. Do not re-pair Vaillant. A Supervisor backup
+   of Preview 0.18.0 offers an additional in-place rollback path.
+
+Never publish raw full SHIP traces, certificates or private keys.

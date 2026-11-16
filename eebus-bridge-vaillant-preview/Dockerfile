@@ -12,7 +12,7 @@ COPY --from=regctl /regctl /usr/local/bin/regctl
 COPY fetch-verified-preview.sh /usr/local/bin/fetch-verified-preview
 RUN chmod 0755 /usr/local/bin/fetch-verified-preview \
  && /usr/local/bin/fetch-verified-preview \
-      "ghcr.io/meneomic/eebus-bridge@sha256:4dfdb01974d7a304beac4b1f739c0953a247646c50abb88661f7b75df78cb938" /verified/eebus-bridge
+      "ghcr.io/meneomic/eebus-bridge@sha256:c52fcc0615408ef5fe00da7f0fd0ae3653b60f28f848434e3b6ba397cec6e2e8" /verified/eebus-bridge
 
 # Final image contains neither verifier tool nor download credentials.
 # hadolint ignore=DL3006

@@ -1,9 +1,9 @@
 name: EEBUS Bridge Vaillant Preview
-version: "0.18.0"
+version: "0.18.1"
 slug: eebus_bridge_vaillant_preview
 description: >-
   Experimental signed Vaillant ecoTEC EEBUS bridge with MPC watchdog fix and
-  opt-in SPINE diagnostics. Back up and stop the original bridge before use.
+  opt-in heating-triggered SPINE diagnostics. Preserve the original bridge for rollback.
 url: https://github.com/meneomic/eebus-ha-bridge-v940f/tree/feat/vaillant-rc-preview/eebus-bridge-vaillant-preview
 arch:
   - amd64

@@ -6,6 +6,10 @@ on:
   push:
     branches:
       - feat/vaillant-rc-preview
+    paths:
+      - 'eebus-bridge/**'
+      - 'scripts/smoke-image.sh'
+      - '.github/workflows/vaillant-preview-image.yml'
   workflow_dispatch:
 
 permissions:
