@@ -1661,7 +1661,9 @@ async def test_not_found_poll_does_not_invalidate_shared_channel_or_bridge() -> 
         await coordinator._async_update_data()
 
     coordinator._channel_manager.invalidate.assert_not_awaited()
-    coordinator._poller.reset_after_transport_error.assert_not_called()
+    coordinator._poller.reset_after_transport_error.assert_called_once_with(
+        grpc.StatusCode.NOT_FOUND
+    )
     coordinator._runtime.mark_unavailable.assert_not_called()
 
 

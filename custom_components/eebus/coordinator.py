@@ -273,10 +273,12 @@ class EebusCoordinator(DataUpdateCoordinator[DeviceState]):
             return state
         except grpc.aio.AioRpcError as err:
             if err.code() == grpc.StatusCode.NOT_FOUND:
-                # The bridge is reachable; the remote EEBUS device may still
-                # be discovered after an add-on restart. Keep the shared
-                # channel and its event streams alive, and preserve the
-                # poller's NOT_FOUND streak for bounded re-registration.
+                # The bridge is reachable, but a newly restarted bridge may
+                # have lost its in-memory remote SKI registration. Keep the
+                # shared channel and streams alive while allowing the next
+                # poll to register that SKI again. The NOT_FOUND streak is
+                # retained for bounded forced re-registration.
+                self._poller.reset_after_transport_error(grpc.StatusCode.NOT_FOUND)
                 _LOGGER.debug(
                     "EEBUS remote device not yet available at %s:%s: %s",
                     self.host,
