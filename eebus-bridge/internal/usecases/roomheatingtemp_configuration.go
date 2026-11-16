@@ -137,6 +137,9 @@ func (f *CRHTConfigurationFacade) HandleEvent(
 	}
 	if f.debug {
 		log.Printf("[DEBUG] EEBUS room heating temperature event received: ski=%s event=%s", eebus.ShortSKI(ski), event)
+		// Heating/temperature callbacks are present on Vaillant ecoTEC even when
+		// Monitoring of Power Consumption (MPC) is not advertised.
+		eebus.DefaultUseCaseDiscovery().LogOnce(ski, device)
 	}
 
 	var eventType eebus.EventType
