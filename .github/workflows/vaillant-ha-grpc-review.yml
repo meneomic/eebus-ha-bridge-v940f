@@ -1,0 +1,42 @@
+# Independent review-only validation: main branch CI targets main PRs only.
+# This workflow does not publish images or deploy to Home Assistant.
+name: Vaillant HA gRPC stream regression (review only)
+
+on:
+  push:
+    branches:
+      - fix/ha-grpc-device-not-found-stream-resilience
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/fix/ha-grpc-device-not-found-stream-resilience'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.14', '3.15']
+    steps:
+      - name: Check out review-only revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test and check tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov ruff mypy grpc-stubs "homeassistant>=2026.11.0" voluptuous grpcio protobuf
+      - name: Ruff lint
+        run: ruff check custom_components/
+      - name: Mypy strict
+        run: mypy custom_components/eebus
+      - name: Focused gRPC lifecycle tests
+        run: PYTHONPATH=. pytest -v custom_components/eebus/tests/test_streams.py custom_components/eebus/tests/test_coordinator.py
+      - name: Full Python suite except cross-language harness
+        run: PYTHONPATH=. pytest -m "not cross_language" -q
