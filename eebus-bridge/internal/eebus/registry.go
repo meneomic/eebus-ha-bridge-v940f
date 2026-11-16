@@ -75,6 +75,7 @@ type deviceHealthStore struct {
 	mu                sync.RWMutex
 	monitoring        map[string]deviceMonitoringState
 	heartbeatRequired map[string]bool
+	monitoringAdvertised map[string]bool
 }
 
 type deviceCapabilityStore struct {
@@ -93,6 +94,7 @@ type deviceMonitoringState struct {
 	lastMonitoringSuccess      time.Time
 	monitoringSuccessOnConnect bool
 	heartbeatRequired          bool
+	monitoringAdvertised       bool
 	lastRemoteHeartbeat        time.Time
 }
 
@@ -111,6 +113,11 @@ type DeviceHealthSnapshot struct {
 	// advertise MPC monitoring but has a usable room-heating capability. It
 	// must never suppress a required EEBUS heartbeat watchdog.
 	MonitoringNotRequired bool
+	// MonitoringDiscoveryPending is set before this connection has proven
+	// a monitoring use case, mandatory LPC heartbeat or the explicit
+	// room-heating-only exception. It allows a bounded SPINE discovery grace
+	// without suppressing the watchdog for proven monitoring devices.
+	MonitoringDiscoveryPending bool
 }
 
 // Clock provides the current time for monitoring-health tracking. Tests can
@@ -138,6 +145,7 @@ func NewDeviceRegistryWithClock(clock Clock) *DeviceRegistry {
 		health: deviceHealthStore{
 			monitoring:        make(map[string]deviceMonitoringState),
 			heartbeatRequired: make(map[string]bool),
+			monitoringAdvertised: make(map[string]bool),
 		},
 		capabilities: deviceCapabilityStore{
 			entries:           make(map[string]map[Capability]DeviceCapability),
@@ -179,6 +187,7 @@ func (r *DeviceRegistry) MarkConnected(ski string) {
 	state.monitoringSuccessOnConnect = false
 	state.lastRemoteHeartbeat = time.Time{}
 	state.heartbeatRequired = r.health.heartbeatRequired[ski]
+	state.monitoringAdvertised = r.health.monitoringAdvertised[ski]
 	r.health.monitoring[ski] = state
 	r.health.mu.Unlock()
 	r.markCapabilitiesConnected(ski)
@@ -412,6 +421,9 @@ func (r *DeviceRegistry) deviceHealthSnapshot(ski string, state deviceMonitoring
 		LastMonitoringSuccess:      state.lastMonitoringSuccess,
 		MonitoringSuccessOnConnect: state.monitoringSuccessOnConnect && heartbeatOnConnection(state),
 		MonitoringNotRequired: r.monitoringNotRequired(ski, state.heartbeatRequired),
+		MonitoringDiscoveryPending: !state.monitoringAdvertised &&
+			!state.heartbeatRequired && !state.monitoringSuccessOnConnect &&
+			!r.monitoringNotRequired(ski, state.heartbeatRequired),
 	}
 }
 
@@ -596,6 +608,7 @@ func (r *DeviceRegistry) RemoveDevice(ski string) {
 	r.health.mu.Lock()
 	delete(r.health.monitoring, ski)
 	delete(r.health.heartbeatRequired, ski)
+	delete(r.health.monitoringAdvertised, ski)
 	r.health.mu.Unlock()
 	r.capabilities.mu.Lock()
 	delete(r.capabilities.entries, ski)

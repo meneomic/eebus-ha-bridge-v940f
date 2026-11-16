@@ -99,3 +99,95 @@ func TestRoomHeatingOnlyCapabilityCanResolvePriorRecovery(t *testing.T) {
 		t.Fatalf("confirmed room-heating-only device was not restored to healthy: %+v", snapshot)
 	}
 }
+
+func TestUnknownVaillantCapabilitiesUseBoundedDiscoveryGrace(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 11, 16, 13, 53, 0, 0, time.UTC)}
+	registry := eebus.NewDeviceRegistryWithClock(clock)
+	registry.MarkConnected("AA11")
+	controller := &countingRecoveryController{}
+	supervisor := eebus.NewRecoverySupervisor(registry, controller, eebus.RecoveryConfig{
+		StaleThreshold: 10 * time.Minute, GracePeriod: 2 * time.Minute,
+		BaseBackoff: 2 * time.Minute, MaxBackoff: 8 * time.Minute, MaxAttempts: 3,
+	})
+	supervisor.Tick(clock.now)
+	clock.now = clock.now.Add(3 * time.Minute)
+	// Legacy stale detection would recover at two minutes. RecoverySupervisor
+	// must defer while support discovery is unresolved.
+	if got := registry.StaleDevices(10*time.Minute, 2*time.Minute); len(got) != 1 {
+		t.Fatalf("test requires an otherwise-stale device, got %v", got)
+	}
+	supervisor.Tick(clock.now)
+	if controller.registers != 0 || supervisor.Snapshot("AA11", clock.now).Attempts != 0 {
+		t.Fatal("unresolved use-case discovery triggered premature reconnect")
+	}
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityMonitoring, false)
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityRoomHeating, true)
+	clock.now = clock.now.Add(3 * time.Minute)
+	supervisor.Tick(clock.now)
+	if controller.registers != 0 {
+		t.Fatal("room heating binding still pending must not trigger recovery within grace")
+	}
+	registry.RecordCapabilityRead("AA11", eebus.CapabilityRoomHeating, nil)
+	supervisor.Tick(clock.now)
+	if got := supervisor.Snapshot("AA11", clock.now); got.State != eebus.RecoveryStateHealthy || got.Attempts != 0 {
+		t.Fatalf("room heating resolved without reconnect: %+v", got)
+	}
+}
+
+func TestDiscoveryGraceExpiresWhenNoCapabilityArrives(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 11, 16, 13, 53, 0, 0, time.UTC)}
+	registry := eebus.NewDeviceRegistryWithClock(clock)
+	registry.MarkConnected("AA11")
+	controller := &countingRecoveryController{}
+	supervisor := eebus.NewRecoverySupervisor(registry, controller, eebus.RecoveryConfig{
+		StaleThreshold: 10 * time.Minute, GracePeriod: 2 * time.Minute,
+		BaseBackoff: 2 * time.Minute, MaxBackoff: 8 * time.Minute, MaxAttempts: 3,
+	})
+	supervisor.Tick(clock.now)
+	clock.now = clock.now.Add(11 * time.Minute)
+	supervisor.Tick(clock.now)
+	if controller.registers != 1 || supervisor.Snapshot("AA11", clock.now).Attempts != 1 {
+		t.Fatal("bounded discovery grace suppressed genuine stale recovery")
+	}
+}
+
+func TestAdvertisedMonitoringBypassesDiscoveryGrace(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 11, 16, 13, 53, 0, 0, time.UTC)}
+	registry := eebus.NewDeviceRegistryWithClock(clock)
+	registry.MarkConnected("AA11")
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityMonitoring, true)
+	controller := &countingRecoveryController{}
+	supervisor := eebus.NewRecoverySupervisor(registry, controller, eebus.RecoveryConfig{
+		StaleThreshold: 10 * time.Minute, GracePeriod: 2 * time.Minute,
+		BaseBackoff: 2 * time.Minute, MaxBackoff: 8 * time.Minute, MaxAttempts: 3,
+	})
+	supervisor.Tick(clock.now)
+	clock.now = clock.now.Add(3 * time.Minute)
+	supervisor.Tick(clock.now)
+	if controller.registers != 1 {
+		t.Fatal("advertised monitoring lost its regular two-minute watchdog")
+	}
+}
+
+func TestAdvertisedHeartbeatBypassesDiscoveryGrace(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 11, 16, 13, 53, 0, 0, time.UTC)}
+	registry := eebus.NewDeviceRegistryWithClock(clock)
+	registry.MarkConnected("AA11")
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityHeartbeat, true)
+	controller := &countingRecoveryController{}
+	supervisor := eebus.NewRecoverySupervisor(registry, controller, eebus.RecoveryConfig{
+		StaleThreshold: 10 * time.Minute, GracePeriod: 2 * time.Minute,
+		BaseBackoff: 2 * time.Minute, MaxBackoff: 8 * time.Minute, MaxAttempts: 3,
+	})
+	supervisor.Tick(clock.now)
+	clock.now = clock.now.Add(3 * time.Minute)
+	supervisor.Tick(clock.now)
+	if controller.registers != 1 {
+		t.Fatal("required heartbeat lost its regular two-minute watchdog")
+	}
+}
+
+type countingRecoveryController struct { registers int }
+
+func (c *countingRecoveryController) RegisterRemoteSKI(string) { c.registers++ }
+func (c *countingRecoveryController) UnregisterRemoteSKI(string) {}

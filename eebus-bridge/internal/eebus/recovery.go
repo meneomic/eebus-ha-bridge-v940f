@@ -93,10 +93,17 @@ func (s *RecoverySupervisor) Tick(now time.Time) RecoveryTickResult {
 		return RecoveryTickResult{}
 	}
 	health := s.registry.ListDeviceHealth()
+	healthBySKI := make(map[string]DeviceHealthSnapshot, len(health))
+	for _, device := range health {
+		healthBySKI[NormalizeSKI(device.SKI)] = device
+	}
 	stale := s.registry.StaleDevices(s.config.StaleThreshold, s.config.GracePeriod)
 	staleSet := make(map[string]struct{}, len(stale))
 	for _, ski := range stale {
 		ski = NormalizeSKI(ski)
+		if device, ok := healthBySKI[ski]; ok && s.inDiscoveryGrace(now, device) {
+			continue
+		}
 		staleSet[ski] = struct{}{}
 		s.recover(now, ski)
 	}
@@ -110,6 +117,16 @@ func (s *RecoverySupervisor) Tick(now time.Time) RecoveryTickResult {
 	}
 
 	return s.restartDecision(health)
+}
+
+// inDiscoveryGrace prevents premature reconnects while a newly connected
+// peer is still advertising its SPINE use cases. The grace is bounded by the
+// existing 10-minute stale threshold; devices that have advertised MPC or LPC
+// heartbeat bypass it and retain the normal two-minute connection grace.
+func (s *RecoverySupervisor) inDiscoveryGrace(now time.Time, device DeviceHealthSnapshot) bool {
+	return device.Connected && device.MonitoringDiscoveryPending &&
+		!device.ConnectedAt.IsZero() &&
+		now.Before(device.ConnectedAt.Add(s.config.StaleThreshold))
 }
 
 func (s *RecoverySupervisor) recover(now time.Time, ski string) {
@@ -189,6 +206,9 @@ func (s *RecoverySupervisor) reconcileHealthy(now time.Time, device DeviceHealth
 		s.transitionLocked(record, state, now)
 		if state == RecoveryStateGracePeriod {
 			record.NextAttemptAt = now.Add(s.config.GracePeriod)
+			if s.inDiscoveryGrace(now, device) {
+				record.NextAttemptAt = device.ConnectedAt.Add(s.config.StaleThreshold)
+			}
 		}
 		s.mu.Unlock()
 		return
@@ -215,6 +235,14 @@ func (s *RecoverySupervisor) reconcileHealthy(now time.Time, device DeviceHealth
 		return
 	}
 	if state == RecoveryStateExhausted {
+		return
+	}
+	if s.inDiscoveryGrace(now, device) {
+		s.mu.Lock()
+		record = s.recordLocked(ski, now)
+		record.NextAttemptAt = device.ConnectedAt.Add(s.config.StaleThreshold)
+		s.transitionLocked(record, RecoveryStateGracePeriod, now)
+		s.mu.Unlock()
 		return
 	}
 	if retryAfterGrace {
