@@ -187,9 +187,9 @@ func TestAdvertisedHeartbeatBypassesDiscoveryGrace(t *testing.T) {
 	}
 }
 
-type countingRecoveryController struct { registers int }
+type countingRecoveryController struct{ registers int }
 
-func (c *countingRecoveryController) RegisterRemoteSKI(string) { c.registers++ }
+func (c *countingRecoveryController) RegisterRemoteSKI(string)   { c.registers++ }
 func (c *countingRecoveryController) UnregisterRemoteSKI(string) {}
 
 func TestMonitoringAdvertisedAfterInitialDiscoveryGraceForcesImmediateRecovery(t *testing.T) {
