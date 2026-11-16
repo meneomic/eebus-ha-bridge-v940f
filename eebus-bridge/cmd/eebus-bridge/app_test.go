@@ -688,6 +688,9 @@ func TestMonitoringRecoveryDoesNotTouchOtherDevicesOrRunInParallel(t *testing.T)
 	registry.AddDevice("AA11", eebus.DeviceInfo{})
 	registry.UpsertObservation("AA11", nil, targetEntity, "monitoring")
 	registry.MarkConnected("AA11")
+	// This test exercises recovery for a peer with advertised MPC. Devices
+	// whose SPINE use cases are still unknown receive a bounded startup grace.
+	registry.RecordCapabilitySupport("AA11", eebus.CapabilityMonitoring, true)
 	registry.AddDevice("BB22", eebus.DeviceInfo{})
 	registry.UpsertObservation("BB22", nil, otherEntity, "monitoring")
 	registry.MarkConnected("BB22")

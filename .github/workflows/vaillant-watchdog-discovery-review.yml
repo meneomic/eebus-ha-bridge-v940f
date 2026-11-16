@@ -1,0 +1,39 @@
+name: Vaillant SPINE discovery watchdog (review only)
+
+on:
+  push:
+    branches:
+      - fix/vaillant-watchdog-discovery-grace
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/fix/vaillant-watchdog-discovery-grace'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eebus-bridge
+    steps:
+      - name: Checkout review revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+          check-latest: true
+          cache-dependency-path: eebus-bridge/go.sum
+      - name: Check gofmt
+        run: |
+          files="$(gofmt -l internal/eebus/registry.go internal/eebus/capabilities.go internal/eebus/recovery.go internal/eebus/monitoring_applicability_test.go)"
+          if [ -n "$files" ]; then echo "$files"; gofmt -d internal/eebus/registry.go; exit 1; fi
+      - name: Go vet
+        run: go vet ./internal/eebus/...
+      - name: Unit and race tests
+        run: go test -count=1 -race ./internal/eebus/...
+      - name: Go full suite
+        run: go test -count=1 ./...
