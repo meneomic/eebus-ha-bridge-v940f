@@ -1,0 +1,39 @@
+name: Vaillant preview app packaging (no deployment)
+
+on:
+  push:
+    branches:
+      - feat/vaillant-rc-preview
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate backup identity importer
+        run: python3 -m unittest scripts.tests.test_vaillant_backup_import -v
+      - name: Lint preview app config
+        uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2.21.2
+        with:
+          path: ./eebus-bridge-vaillant-preview
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: eebus-bridge-vaillant-preview/Dockerfile
+      - name: Build preview app from anonymously accessible, signed OCI digest
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --tag eebus-vaillant-preview:ci \
+            eebus-bridge-vaillant-preview
+          docker run --rm --entrypoint /bin/sh eebus-vaillant-preview:ci -c \
+            'test -x /usr/local/bin/eebus-bridge && \
+             test -x /usr/local/bin/import-eebus-identity && \
+             test ! -e /usr/local/bin/cosign && \
+             test ! -e /usr/local/bin/regctl'

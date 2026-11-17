@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +57,7 @@ class OperationalDiagnostics:
     snapshot_last_success: datetime | None
     providers: tuple[ProviderSampleProjection, ...]
     features: tuple[str, ...]
+    spine_inventory: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)

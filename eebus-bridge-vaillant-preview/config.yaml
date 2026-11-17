@@ -1,0 +1,36 @@
+name: EEBUS Bridge Vaillant Preview
+version: "0.18.2"
+slug: eebus_bridge_vaillant_preview
+description: >-
+  Experimental signed Vaillant ecoTEC EEBUS bridge: gRPC stream resilience,
+  bounded SPINE discovery watchdog and read-only SPINE diagnostics.
+  Preserve the original bridge for rollback.
+url: https://github.com/meneomic/eebus-ha-bridge-v940f/tree/release/vaillant-preview-0.18.2-rc1/eebus-bridge-vaillant-preview
+arch:
+  - amd64
+host_network: true
+init: false
+startup: services
+# Backup mount is read-only. It is used once to import pairing identity from a
+# verified local backup directly to this app's private /data. No /share secrets.
+map:
+  - type: backup
+    read_only: true
+options:
+  migration_backup_slug: ""
+  grpc_port: 50051
+  eebus_port: 4712
+  vendor: HomeAssistant
+  brand: Home Assistant
+  model: eebus-bridge
+  debug_events: false
+  ship_log: false
+schema:
+  migration_backup_slug: str
+  grpc_port: port
+  eebus_port: port
+  vendor: str
+  brand: str
+  model: str
+  debug_events: bool
+  ship_log: bool

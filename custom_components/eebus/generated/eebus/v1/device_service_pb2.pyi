@@ -53,6 +53,7 @@ class FeatureId(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     FEATURE_PROVIDER_SAMPLE_INVALIDATION: _ClassVar[FeatureId]
     FEATURE_TYPED_MEASUREMENTS: _ClassVar[FeatureId]
     FEATURE_OPERATIONAL_DIAGNOSTICS: _ClassVar[FeatureId]
+    FEATURE_SPINE_READONLY_INVENTORY: _ClassVar[FeatureId]
 
 class DeviceReadinessState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -165,6 +166,7 @@ FEATURE_DEVICE_SNAPSHOT: FeatureId
 FEATURE_PROVIDER_SAMPLE_INVALIDATION: FeatureId
 FEATURE_TYPED_MEASUREMENTS: FeatureId
 FEATURE_OPERATIONAL_DIAGNOSTICS: FeatureId
+FEATURE_SPINE_READONLY_INVENTORY: FeatureId
 DEVICE_READINESS_UNKNOWN: DeviceReadinessState
 DEVICE_READINESS_UNTRUSTED: DeviceReadinessState
 DEVICE_READINESS_DISCONNECTED: DeviceReadinessState
@@ -334,7 +336,7 @@ class ProviderSampleDiagnostics(_message.Message):
     def __init__(self, provider: _Optional[str] = ..., state: _Optional[_Union[ProviderSampleState, str]] = ..., observed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., valid_until: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DeviceOperationalDiagnostics(_message.Message):
-    __slots__ = ("redacted_ski", "readiness", "recovery", "events", "monitoring_last_success_age_seconds", "snapshot_reads", "providers", "features", "connection_age_seconds")
+    __slots__ = ("redacted_ski", "readiness", "recovery", "events", "monitoring_last_success_age_seconds", "snapshot_reads", "providers", "features", "connection_age_seconds", "spine_inventory")
     REDACTED_SKI_FIELD_NUMBER: _ClassVar[int]
     READINESS_FIELD_NUMBER: _ClassVar[int]
     RECOVERY_FIELD_NUMBER: _ClassVar[int]
@@ -344,6 +346,7 @@ class DeviceOperationalDiagnostics(_message.Message):
     PROVIDERS_FIELD_NUMBER: _ClassVar[int]
     FEATURES_FIELD_NUMBER: _ClassVar[int]
     CONNECTION_AGE_SECONDS_FIELD_NUMBER: _ClassVar[int]
+    SPINE_INVENTORY_FIELD_NUMBER: _ClassVar[int]
     redacted_ski: str
     readiness: DeviceReadinessState
     recovery: RecoveryDiagnostics
@@ -353,7 +356,50 @@ class DeviceOperationalDiagnostics(_message.Message):
     providers: _containers.RepeatedCompositeFieldContainer[ProviderSampleDiagnostics]
     features: _containers.RepeatedScalarFieldContainer[FeatureId]
     connection_age_seconds: int
-    def __init__(self, redacted_ski: _Optional[str] = ..., readiness: _Optional[_Union[DeviceReadinessState, str]] = ..., recovery: _Optional[_Union[RecoveryDiagnostics, _Mapping]] = ..., events: _Optional[_Union[EventTransportDiagnostics, _Mapping]] = ..., monitoring_last_success_age_seconds: _Optional[int] = ..., snapshot_reads: _Optional[_Union[SnapshotReadDiagnostics, _Mapping]] = ..., providers: _Optional[_Iterable[_Union[ProviderSampleDiagnostics, _Mapping]]] = ..., features: _Optional[_Iterable[_Union[FeatureId, str]]] = ..., connection_age_seconds: _Optional[int] = ...) -> None: ...
+    spine_inventory: SpineInventoryDiagnostics
+    def __init__(self, redacted_ski: _Optional[str] = ..., readiness: _Optional[_Union[DeviceReadinessState, str]] = ..., recovery: _Optional[_Union[RecoveryDiagnostics, _Mapping]] = ..., events: _Optional[_Union[EventTransportDiagnostics, _Mapping]] = ..., monitoring_last_success_age_seconds: _Optional[int] = ..., snapshot_reads: _Optional[_Union[SnapshotReadDiagnostics, _Mapping]] = ..., providers: _Optional[_Iterable[_Union[ProviderSampleDiagnostics, _Mapping]]] = ..., features: _Optional[_Iterable[_Union[FeatureId, str]]] = ..., connection_age_seconds: _Optional[int] = ..., spine_inventory: _Optional[_Union[SpineInventoryDiagnostics, _Mapping]] = ...) -> None: ...
+
+class SpineInventoryDiagnostics(_message.Message):
+    __slots__ = ("entities", "zone_label", "connected")
+    ENTITIES_FIELD_NUMBER: _ClassVar[int]
+    ZONE_LABEL_FIELD_NUMBER: _ClassVar[int]
+    CONNECTED_FIELD_NUMBER: _ClassVar[int]
+    entities: _containers.RepeatedCompositeFieldContainer[SpineEntityDiagnostics]
+    zone_label: str
+    connected: bool
+    def __init__(self, entities: _Optional[_Iterable[_Union[SpineEntityDiagnostics, _Mapping]]] = ..., zone_label: _Optional[str] = ..., connected: _Optional[bool] = ...) -> None: ...
+
+class SpineEntityDiagnostics(_message.Message):
+    __slots__ = ("address", "entity_type", "functions")
+    ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    ENTITY_TYPE_FIELD_NUMBER: _ClassVar[int]
+    FUNCTIONS_FIELD_NUMBER: _ClassVar[int]
+    address: str
+    entity_type: str
+    functions: _containers.RepeatedCompositeFieldContainer[SpineFunctionDiagnostics]
+    def __init__(self, address: _Optional[str] = ..., entity_type: _Optional[str] = ..., functions: _Optional[_Iterable[_Union[SpineFunctionDiagnostics, _Mapping]]] = ...) -> None: ...
+
+class SpineFunctionDiagnostics(_message.Message):
+    __slots__ = ("feature_address", "feature_type", "function_name", "readable", "read_partial", "writable", "write_partial", "cache_state", "cached_json")
+    FEATURE_ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    FEATURE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    FUNCTION_NAME_FIELD_NUMBER: _ClassVar[int]
+    READABLE_FIELD_NUMBER: _ClassVar[int]
+    READ_PARTIAL_FIELD_NUMBER: _ClassVar[int]
+    WRITABLE_FIELD_NUMBER: _ClassVar[int]
+    WRITE_PARTIAL_FIELD_NUMBER: _ClassVar[int]
+    CACHE_STATE_FIELD_NUMBER: _ClassVar[int]
+    CACHED_JSON_FIELD_NUMBER: _ClassVar[int]
+    feature_address: str
+    feature_type: str
+    function_name: str
+    readable: bool
+    read_partial: bool
+    writable: bool
+    write_partial: bool
+    cache_state: str
+    cached_json: str
+    def __init__(self, feature_address: _Optional[str] = ..., feature_type: _Optional[str] = ..., function_name: _Optional[str] = ..., readable: _Optional[bool] = ..., read_partial: _Optional[bool] = ..., writable: _Optional[bool] = ..., write_partial: _Optional[bool] = ..., cache_state: _Optional[str] = ..., cached_json: _Optional[str] = ...) -> None: ...
 
 class DiscoveredDevice(_message.Message):
     __slots__ = ("ski", "brand", "model", "serial", "device_type", "host")

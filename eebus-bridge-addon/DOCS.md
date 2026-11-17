@@ -50,11 +50,66 @@ heat pump's app asks for when pairing.
 | `model` | `eebus-bridge` | Model name announced over EEBUS |
 | `serial` | *(generated)* | Serial number announced over EEBUS |
 | `experimental_mgcp_provider` | `false` | Exposes the experimental MGCP grid-connection-point provider so the heat pump can read the household balance from Home Assistant and run its own PV-surplus energy management. Only takes effect after the commissioning steps in the project README (bridge trusted in the myVAILLANT app, energy-management sliders enabled) and the grid/PV entities are selected in the integration's options. Not hardware-final on the VR 940f. |
+| `debug_events` | `false` | Opt-in [DISCOVERY] inventory of remote SPINE entities, functions, and read/write permissions, plus bridge debug events. |
+| `ship_log` | `false` | Opt-in SHIP handshake/disconnect diagnostics for troubleshooting repeated connection recovery. |
 
 Leaving `serial` empty makes the add-on generate one on first start and keep it
 in `/data`. Changing `serial`, `vendor`, `brand` or `model` later changes the
 announced device identity, and the heat pump may then treat the bridge as a new
 device that has to be paired again.
+
+## Vaillant local capability inventory (optional, read-only)
+
+**Deployment restriction (important):** The diagnostic options added in this
+fork's feature branch are **not available in the installed upstream add-on
+v0.18.0**. Merely editing GitHub files does not change a running add-on.
+Installing this fork as a second add-on creates a **separate add-on identity
+and /data storage**, so its SKI/certificate would differ and the two daemons
+would conflict on the host-network SHIP/gRPC ports. Do not install a second
+instance or uninstall the existing one. A controlled, backed-up migration
+that retains certificate + serial identity must be prepared and tested
+separately before the settings below can be used on the production system.
+
+For an already collected log containing [DISCOVERY] lines, the independent
+offline script at `scripts/spine_inventory.py` can create a redacted
+read/write function inventory without needing any access to the boiler:
+
+```bash
+python3 scripts/spine_inventory.py bridge.log --output spine-report.md
+python3 scripts/spine_inventory.py bridge.log --format json --output spine-report.json
+```
+
+The current production log without discovery debug events cannot be
+used to reconstruct functions not captured in it. The tool will report
+that no useful inventory was found instead of guessing.
+
+The bridge already has a [DISCOVERY] function inventory in
+`eebus-bridge/internal/eebus/discovery.go`. On Vaillant VR 940f installations
+(including boilers with a VRC 720), enable **Diagnostics: SPINE discovery**
+(`debug_events: true`) in the add-on Configuration tab, then restart **this
+same add-on**. Do not uninstall it or delete `/data`.
+
+After the gateway connects and detailed discovery arrives, search the add-on
+Log tab for `[DISCOVERY]`. Entries enumerate remote entities, feature
+functions, and operations: `r` = read, `rp` = read partial, `w` = write,
+`wp` = write partial. This inventory is **not** a live value dump: advertised
+operations do not prove the gateway returns useful values or accepts commands.
+The bridge logs an inventory once per discovered device per process start, so
+allow the normal connection/discovery to complete. No new SPINE write request
+is needed for this test.
+
+For repeated `monitoring recovery` / `stale` events, optionally enable
+**Diagnostics: SHIP connection** (`ship_log: true`) for a short period.
+These logs help distinguish transport disconnects from absent/stale
+measurements; neither flag automatically repairs a connection. The detailed
+SHIP message trace (`ship_trace`) is intentionally not available through
+the add-on UI because it can include extensive sensitive protocol data.
+
+**Privacy:** Logs can contain network details, remote device identifiers,
+user-defined names and equipment metadata. Review and redact them before
+posting publicly (particularly SKIs, serials, MAC/IP addresses and tokens).
+Switch both options off and restart the add-on after the capture. Certificate
+and generated serial persistence in `/data` is unaffected by these toggles.
 
 ## Persistent data
 

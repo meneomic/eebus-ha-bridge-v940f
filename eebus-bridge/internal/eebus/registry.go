@@ -72,9 +72,10 @@ type deviceCatalogStore struct {
 }
 
 type deviceHealthStore struct {
-	mu                sync.RWMutex
-	monitoring        map[string]deviceMonitoringState
-	heartbeatRequired map[string]bool
+	mu                   sync.RWMutex
+	monitoring           map[string]deviceMonitoringState
+	heartbeatRequired    map[string]bool
+	monitoringAdvertised map[string]bool
 }
 
 type deviceCapabilityStore struct {
@@ -93,6 +94,7 @@ type deviceMonitoringState struct {
 	lastMonitoringSuccess      time.Time
 	monitoringSuccessOnConnect bool
 	heartbeatRequired          bool
+	monitoringAdvertised       bool
 	lastRemoteHeartbeat        time.Time
 }
 
@@ -107,6 +109,15 @@ type DeviceHealthSnapshot struct {
 	LastTransitionAt           time.Time
 	LastMonitoringSuccess      time.Time
 	MonitoringSuccessOnConnect bool
+	// MonitoringNotRequired is true only when the remote explicitly does not
+	// advertise MPC monitoring but has a usable room-heating capability. It
+	// must never suppress a required EEBUS heartbeat watchdog.
+	MonitoringNotRequired bool
+	// MonitoringDiscoveryPending is set before this connection has proven
+	// a monitoring use case, mandatory LPC heartbeat or the explicit
+	// room-heating-only exception. It allows a bounded SPINE discovery grace
+	// without suppressing the watchdog for proven monitoring devices.
+	MonitoringDiscoveryPending bool
 }
 
 // Clock provides the current time for monitoring-health tracking. Tests can
@@ -132,8 +143,9 @@ func NewDeviceRegistryWithClock(clock Clock) *DeviceRegistry {
 	return &DeviceRegistry{
 		catalog: deviceCatalogStore{devices: make(map[string]DeviceInfo)},
 		health: deviceHealthStore{
-			monitoring:        make(map[string]deviceMonitoringState),
-			heartbeatRequired: make(map[string]bool),
+			monitoring:           make(map[string]deviceMonitoringState),
+			heartbeatRequired:    make(map[string]bool),
+			monitoringAdvertised: make(map[string]bool),
 		},
 		capabilities: deviceCapabilityStore{
 			entries:           make(map[string]map[Capability]DeviceCapability),
@@ -175,6 +187,7 @@ func (r *DeviceRegistry) MarkConnected(ski string) {
 	state.monitoringSuccessOnConnect = false
 	state.lastRemoteHeartbeat = time.Time{}
 	state.heartbeatRequired = r.health.heartbeatRequired[ski]
+	state.monitoringAdvertised = r.health.monitoringAdvertised[ski]
 	r.health.monitoring[ski] = state
 	r.health.mu.Unlock()
 	r.markCapabilitiesConnected(ski)
@@ -298,6 +311,28 @@ func heartbeatOnConnection(state deviceMonitoringState) bool {
 	return !state.heartbeatRequired || !state.lastRemoteHeartbeat.IsZero()
 }
 
+// monitoringNotRequired is deliberately conservative: a missing MPC use case
+// is not evidence of an unhealthy EEBUS connection for a room-heating-only
+// boiler. We exempt such devices only after the capability map explicitly
+// reports remote MPC absence AND a working room-heating capability.
+// A required LPC heartbeat always overrides this exemption.
+func (r *DeviceRegistry) monitoringNotRequired(ski string, heartbeatRequired bool) bool {
+	if heartbeatRequired {
+		return false
+	}
+	r.capabilities.mu.RLock()
+	defer r.capabilities.mu.RUnlock()
+	entries, ok := r.capabilities.entries[ski]
+	if !ok {
+		return false
+	}
+	monitoring := entries[CapabilityMonitoring]
+	roomHeating := entries[CapabilityRoomHeating]
+	return monitoring.State == CapabilityStateUnsupported &&
+		monitoring.Reason == CapabilityReasonRemoteNotAdvertised &&
+		roomHeating.State == CapabilityStateAvailable
+}
+
 // StaleDevices returns connected device SKIs whose grace period has elapsed
 // without a success on the current connection, or whose most recent success
 // on that connection is older than threshold.
@@ -309,6 +344,9 @@ func (r *DeviceRegistry) StaleDevices(threshold, gracePeriod time.Duration) []st
 	result := make([]string, 0)
 	for ski, state := range r.health.monitoring {
 		if !state.connected || now.Sub(state.connectedAt) <= gracePeriod {
+			continue
+		}
+		if r.monitoringNotRequired(ski, state.heartbeatRequired) {
 			continue
 		}
 		heartbeatStale := state.heartbeatRequired && (!heartbeatOnConnection(state) || now.Sub(state.lastRemoteHeartbeat) > remoteHeartbeatTolerance)
@@ -358,7 +396,7 @@ func (r *DeviceRegistry) DeviceHealth(ski string) (DeviceHealthSnapshot, bool) {
 	if !ok {
 		return DeviceHealthSnapshot{}, false
 	}
-	return deviceHealthSnapshot(ski, state), true
+	return r.deviceHealthSnapshot(ski, state), true
 }
 
 func (r *DeviceRegistry) ListDeviceHealth() []DeviceHealthSnapshot {
@@ -366,13 +404,13 @@ func (r *DeviceRegistry) ListDeviceHealth() []DeviceHealthSnapshot {
 	defer r.health.mu.RUnlock()
 	result := make([]DeviceHealthSnapshot, 0, len(r.health.monitoring))
 	for ski, state := range r.health.monitoring {
-		result = append(result, deviceHealthSnapshot(ski, state))
+		result = append(result, r.deviceHealthSnapshot(ski, state))
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].SKI < result[j].SKI })
 	return result
 }
 
-func deviceHealthSnapshot(ski string, state deviceMonitoringState) DeviceHealthSnapshot {
+func (r *DeviceRegistry) deviceHealthSnapshot(ski string, state deviceMonitoringState) DeviceHealthSnapshot {
 	return DeviceHealthSnapshot{
 		SKI:                        ski,
 		Connected:                  state.connected,
@@ -382,6 +420,10 @@ func deviceHealthSnapshot(ski string, state deviceMonitoringState) DeviceHealthS
 		LastTransitionAt:           state.lastTransitionAt,
 		LastMonitoringSuccess:      state.lastMonitoringSuccess,
 		MonitoringSuccessOnConnect: state.monitoringSuccessOnConnect && heartbeatOnConnection(state),
+		MonitoringNotRequired:      r.monitoringNotRequired(ski, state.heartbeatRequired),
+		MonitoringDiscoveryPending: !state.monitoringAdvertised &&
+			!state.heartbeatRequired && !state.monitoringSuccessOnConnect &&
+			!r.monitoringNotRequired(ski, state.heartbeatRequired),
 	}
 }
 
@@ -566,6 +608,7 @@ func (r *DeviceRegistry) RemoveDevice(ski string) {
 	r.health.mu.Lock()
 	delete(r.health.monitoring, ski)
 	delete(r.health.heartbeatRequired, ski)
+	delete(r.health.monitoringAdvertised, ski)
 	r.health.mu.Unlock()
 	r.capabilities.mu.Lock()
 	delete(r.capabilities.entries, ski)

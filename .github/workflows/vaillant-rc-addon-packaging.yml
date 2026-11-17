@@ -1,0 +1,57 @@
+# Review-only add-on packaging for the exact signed binary digest.
+# No registry publication, Supervisor action, release, tag or deployment.
+name: Vaillant Preview 0.18.2 RC1 signed add-on packaging (no deploy)
+on:
+  push:
+    branches:
+      - release/vaillant-preview-0.18.2-rc1
+    paths:
+      - 'eebus-bridge-vaillant-preview/**'
+      - '.github/workflows/vaillant-rc-addon-packaging.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/release/vaillant-preview-0.18.2-rc1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate pinned digest and expected keyless signer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path("eebus-bridge-vaillant-preview/config.yaml").read_text()
+          docker = Path("eebus-bridge-vaillant-preview/Dockerfile").read_text()
+          fetch = Path("eebus-bridge-vaillant-preview/fetch-verified-preview.sh").read_text()
+          assert 'version: "0.18.2"' in config
+          digest = "3e42d9b852c9202cf9a9eac44ca4f4ef8dc315cf4a9946e2de7a734a33f1920c"
+          assert f"ghcr.io/meneomic/eebus-bridge@sha256:{digest}" in docker
+          assert f"@refs/heads/release/vaillant-preview-0.18.2-rc1" in fetch
+          assert "cosign verify" in fetch and "--certificate-identity" in fetch
+          assert re.search(r'identity="https://github.com/meneomic/eebus-ha-bridge-v940f/.github/workflows/vaillant-preview-image.yml@refs/heads/release/vaillant-preview-0.18.2-rc1"',fetch)
+          PY
+      - name: Identity migration backup importer tests
+        run: python3 -m unittest scripts.tests.test_vaillant_backup_import -v
+      - name: Add-on config schema lint
+        uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2.21.2
+        with:
+          path: ./eebus-bridge-vaillant-preview
+      - name: Dockerfile lint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: eebus-bridge-vaillant-preview/Dockerfile
+      - name: Build verified, digest-locked add-on locally
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --tag eebus-vaillant-preview:0.18.2-rc1 \
+            eebus-bridge-vaillant-preview
+          docker run --rm --entrypoint /bin/sh eebus-vaillant-preview:0.18.2-rc1 -c \
+            'test -x /usr/local/bin/eebus-bridge && \
+             test -x /usr/local/bin/import-eebus-identity && \
+             test ! -e /usr/local/bin/cosign && \
+             test ! -e /usr/local/bin/regctl'

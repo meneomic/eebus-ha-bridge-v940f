@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import ipaddress
+import json
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -57,6 +58,38 @@ def _operational_diagnostics_from_proto(
 ) -> OperationalDiagnostics:
     events = value.events
     snapshot = value.snapshot_reads
+    spine_inventory: dict[str, Any] | None = None
+    if value.HasField("spine_inventory"):
+        spine_inventory = {
+            "source": "remote_spine_cache_read_only",
+            "connected": bool(value.spine_inventory.connected),
+            "zone_label": value.spine_inventory.zone_label or None,
+            "entities": [
+                {
+                    "address": entity.address,
+                    "entity_type": entity.entity_type,
+                    "functions": [
+                        {
+                            "feature_address": function.feature_address,
+                            "feature_type": function.feature_type,
+                            "function": function.function_name,
+                            "readable": bool(function.readable),
+                            "read_partial": bool(function.read_partial),
+                            "writable": bool(function.writable),
+                            "write_partial": bool(function.write_partial),
+                            "cache_state": function.cache_state,
+                            "cached_data": (
+                                json.loads(function.cached_json)
+                                if function.cache_state == "cached" and function.cached_json
+                                else None
+                            ),
+                        }
+                        for function in entity.functions
+                    ],
+                }
+                for entity in value.spine_inventory.entities
+            ],
+        }
     return OperationalDiagnostics(
         redacted_ski=value.redacted_ski,
         readiness=proto_stubs.DeviceReadinessState.Name(value.readiness),
@@ -87,6 +120,7 @@ def _operational_diagnostics_from_proto(
             for provider in value.providers
         ),
         features=tuple(proto_stubs.FeatureId.Name(feature) for feature in value.features),
+        spine_inventory=spine_inventory,
     )
 
 

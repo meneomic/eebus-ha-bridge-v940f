@@ -91,6 +91,7 @@ enum FeatureId {
   FEATURE_PROVIDER_SAMPLE_INVALIDATION = 4;
   FEATURE_TYPED_MEASUREMENTS = 5;
   FEATURE_OPERATIONAL_DIAGNOSTICS = 6;
+  FEATURE_SPINE_READONLY_INVENTORY = 7;
 }
 
 message DeviceStatus {
@@ -156,6 +157,38 @@ message DeviceOperationalDiagnostics {
   repeated ProviderSampleDiagnostics providers = 7;
   repeated FeatureId features = 8;
   optional uint64 connection_age_seconds = 9;
+  SpineInventoryDiagnostics spine_inventory = 10;
+}
+
+// Read-only, cache-backed SPINE inspection. The bridge never sends SPINE writes
+// from the diagnostic RPC. No SKI, serial, certificate or credentials are
+// placed into these data structures. cached_json is limited to allowlisted
+// Measurement, HVAC and Setpoint payloads plus HeatingArea user labels.
+message SpineInventoryDiagnostics {
+  repeated SpineEntityDiagnostics entities = 1;
+  string zone_label = 2;
+  bool connected = 3;
+}
+
+message SpineEntityDiagnostics {
+  string address = 1;
+  string entity_type = 2;
+  repeated SpineFunctionDiagnostics functions = 3;
+}
+
+message SpineFunctionDiagnostics {
+  string feature_address = 1;
+  string feature_type = 2;
+  string function_name = 3;
+  bool readable = 4;
+  bool read_partial = 5;
+  bool writable = 6;
+  bool write_partial = 7;
+  // cached, not_cached, not_readable, skipped_sensitive, oversized
+  string cache_state = 8;
+  // JSON for allowlisted cached payloads. Never arbitrary manufacturer or
+  // NodeManagement data. Empty unless cache_state == "cached".
+  string cached_json = 9;
 }
 
 message DiscoveredDevice {

@@ -24,6 +24,19 @@ if bashio::config.true 'experimental_mgcp_provider'; then
     bashio::log.warning "Experimental MGCP grid provider enabled (requires myVAILLANT commissioning to take effect)"
 fi
 
+# Optional read-only discovery / transport diagnostics. These use existing
+# bridge environment overrides and do not change the SHIP identity, certificates,
+# gRPC security or supported control functions. Raw SHIP trace is intentionally
+# not exposed by this add-on.
+if bashio::config.true 'debug_events'; then
+    export EEBUS_DEBUG_EVENTS="true"
+    bashio::log.warning "EEBUS discovery diagnostics enabled; review logs before sharing"
+fi
+if bashio::config.true 'ship_log'; then
+    export EEBUS_SHIP_LOG="true"
+    bashio::log.warning "EEBUS SHIP handshake diagnostics enabled; review logs before sharing"
+fi
+
 # The serial is part of the announced EEBUS device identity, so it has to
 # survive restarts and updates: a new serial makes the heat pump treat the
 # bridge as a different device and forces re-pairing in the vendor app.

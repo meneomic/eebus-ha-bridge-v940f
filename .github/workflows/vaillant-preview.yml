@@ -1,0 +1,58 @@
+# Build only a reviewable binary of our fork. No package publishing, no release
+# tags, and no change to the installed Home Assistant add-on or SHIP identity.
+name: Vaillant preview binary (not deployed)
+
+on:
+  push:
+    branches:
+      - feat/vaillant-rc-preview
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-amd64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out this exact fork commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache-dependency-path: eebus-bridge/go.sum
+      - name: Test patched recovery and bridge
+        working-directory: eebus-bridge
+        run: |
+          go vet ./...
+          go test ./internal/eebus/... ./cmd/eebus-bridge/...
+      - name: Build standalone Linux amd64 preview
+        working-directory: eebus-bridge
+        run: |
+          set -eu
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o dist/eebus-bridge ./cmd/eebus-bridge
+          test -s dist/eebus-bridge
+          chmod 0755 dist/eebus-bridge
+          (cd dist && sha256sum eebus-bridge > SHA256SUMS)
+      - name: Sign build provenance (GitHub/Sigstore)
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: eebus-bridge/dist/eebus-bridge
+      - name: Save preview artifact (NOT a Home Assistant add-on)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vaillant-eebus-preview-linux-amd64
+          path: |
+            eebus-bridge/dist/eebus-bridge
+            eebus-bridge/dist/SHA256SUMS
+          retention-days: 7
+          if-no-files-found: error

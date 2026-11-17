@@ -46,6 +46,9 @@ from .generated.eebus.v1.device_service_pb2 import (
     SnapshotFieldStatus,
     SnapshotReadDiagnostics,
     SnapshotValueState,
+    SpineEntityDiagnostics,
+    SpineFunctionDiagnostics,
+    SpineInventoryDiagnostics,
 )
 from .generated.eebus.v1.device_service_pb2_grpc import DeviceServiceStub
 from .generated.eebus.v1.dhw_service_pb2 import (
@@ -221,6 +224,9 @@ __all__ = [
     "SnapshotFieldStatus",
     "SnapshotReadDiagnostics",
     "SnapshotValueState",
+    "SpineEntityDiagnostics",
+    "SpineFunctionDiagnostics",
+    "SpineInventoryDiagnostics",
     "VisualizationServiceStub",
     "WriteFailsafeLimitRequest",
     "WriteLoadLimitRequest",

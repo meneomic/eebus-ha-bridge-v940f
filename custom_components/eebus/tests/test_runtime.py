@@ -786,3 +786,47 @@ async def test_runtime_handover_ignores_late_previous_session_state() -> None:
     )
 
     coordinator._publish_state.assert_not_called()
+
+def test_spine_inventory_projects_cached_hvac_and_measurements() -> None:
+    """A read-only inventory is distinct from mutable measurement state."""
+    from custom_components.eebus.runtime import _operational_diagnostics_from_proto
+
+    response = proto_stubs.DeviceOperationalDiagnostics(
+        redacted_ski="…7604ED",
+        spine_inventory=proto_stubs.SpineInventoryDiagnostics(
+            connected=True,
+            zone_label="Rdc",
+            entities=[
+                proto_stubs.SpineEntityDiagnostics(
+                    address="3:1:1",
+                    entity_type="HVACRoom",
+                    functions=[
+                        proto_stubs.SpineFunctionDiagnostics(
+                            feature_address="3:1:1:11",
+                            feature_type="Measurement",
+                            function_name="measurementDescriptionListData",
+                            readable=True,
+                            cache_state="cached",
+                            cached_json='{"measurementDescriptionData":[{"measurementId":1,"unit":"degC"}]}',
+                        ),
+                        proto_stubs.SpineFunctionDiagnostics(
+                            feature_address="3:1:1:9",
+                            feature_type="HVAC",
+                            function_name="hvacSystemFunctionSetpointRelationListData",
+                            readable=True,
+                            cache_state="not_cached",
+                        ),
+                    ],
+                )
+            ],
+        ),
+    )
+    result = _operational_diagnostics_from_proto(response)
+    inventory = result.spine_inventory
+    assert inventory is not None
+    assert inventory["source"] == "remote_spine_cache_read_only"
+    assert inventory["zone_label"] == "Rdc"
+    functions = inventory["entities"][0]["functions"]
+    assert functions[0]["cached_data"]["measurementDescriptionData"][0]["unit"] == "degC"
+    assert functions[1]["cache_state"] == "not_cached"
+    assert functions[1]["cached_data"] is None
