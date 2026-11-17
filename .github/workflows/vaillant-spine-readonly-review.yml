@@ -1,0 +1,61 @@
+# Review-only generation/validation, no Home Assistant packaging or deployment.
+name: Vaillant SPINE read-only inventory (review only)
+
+on:
+  push:
+    branches:
+      - feat/vaillant-spine-readonly-inventory
+  workflow_dispatch:
+
+permissions:
+  contents: write # Only commit generated protobuf clients to this isolated feature branch.
+
+jobs:
+  inventory:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/feat/vaillant-spine-readonly-inventory'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+          cache-dependency-path: eebus-bridge/go.sum
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Install pinned code generators and generate both language bindings
+        run: ./generate_proto.sh
+      - name: Apply Go formatting to new Go files
+        run: gofmt -w eebus-bridge/internal/grpc/spine_inventory.go eebus-bridge/internal/grpc/spine_inventory_test.go
+      - name: Install Python tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-asyncio pytest-cov ruff mypy grpc-stubs "homeassistant>=2026.11.0" voluptuous grpcio protobuf
+      - name: Lint Python
+        run: ruff check custom_components/eebus
+      - name: Mypy strict
+        run: mypy custom_components/eebus
+      - name: Python targeted read-only diagnostics tests
+        run: PYTHONPATH=. pytest -v custom_components/eebus/tests/test_runtime.py custom_components/eebus/tests/test_diagnostics.py
+      - name: Full Python suite except cross-language harness
+        run: PYTHONPATH=. pytest -m "not cross_language" -q
+      - name: Go vet
+        working-directory: eebus-bridge
+        run: go vet ./...
+      - name: Go race tests
+        working-directory: eebus-bridge
+        run: go test -count=1 -race ./internal/grpc/...
+      - name: Full Go suite
+        working-directory: eebus-bridge
+        run: go test -count=1 ./...
+      - name: Commit generated files (only after passing all checks)
+        if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[generated]')
+        run: |
+          git add custom_components/eebus/generated/ eebus-bridge/gen/proto/eebus/v1/
+          git add eebus-bridge/internal/grpc/spine_inventory.go eebus-bridge/internal/grpc/spine_inventory_test.go
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(proto): regenerate SPINE inventory bindings [generated]'
+            git push origin HEAD:refs/heads/feat/vaillant-spine-readonly-inventory
+          fi

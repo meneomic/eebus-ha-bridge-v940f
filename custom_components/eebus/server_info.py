@@ -20,6 +20,7 @@ _KNOWN_FEATURES = frozenset(
         int(proto_stubs.FeatureId.FEATURE_PROVIDER_SAMPLE_INVALIDATION),
         int(proto_stubs.FeatureId.FEATURE_TYPED_MEASUREMENTS),
         int(proto_stubs.FeatureId.FEATURE_OPERATIONAL_DIAGNOSTICS),
+        int(proto_stubs.FeatureId.FEATURE_SPINE_READONLY_INVENTORY),
     }
 )
 

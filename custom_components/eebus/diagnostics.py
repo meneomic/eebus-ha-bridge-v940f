@@ -56,6 +56,7 @@ async def async_get_config_entry_diagnostics(
         ),
         "streams": _sanitize(session.streams),
         "bridge_operational": _sanitize(session.operational),
+        "spine_inventory": _sanitize(session.operational.spine_inventory) if session.operational else None,
         "measurements": measurement_diagnostics(),
     }
 

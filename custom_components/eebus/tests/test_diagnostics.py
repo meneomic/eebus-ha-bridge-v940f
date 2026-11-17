@@ -96,3 +96,28 @@ async def test_diagnostics_output():
     assert result["streams"]["last_device_state_revision"] == 42
     assert result["streams"]["primary"]["reconnects"] == 3
     assert result["bridge_operational"] is None
+
+def test_spine_inventory_redacts_identifiers_inside_cached_data() -> None:
+    """Diagnostics sanitization applies recursively to parsed SPINE payloads."""
+    from custom_components.eebus.diagnostics import _sanitize
+
+    cached = {
+        "entities": [
+            {
+                "functions": [
+                    {
+                        "cached_data": {
+                            "ski": "11223344556677889900AABBCCDDEEFF00112233",
+                            "auth_token": "private-key",
+                            "user_label": "Rdc",
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    sanitized = _sanitize(cached)
+    values = sanitized["entities"][0]["functions"][0]["cached_data"]
+    assert values["ski"] == "112233…2233"
+    assert values["auth_token"] == "**REDACTED**"
+    assert values["user_label"] == "Rdc"

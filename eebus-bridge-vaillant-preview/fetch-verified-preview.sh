@@ -9,7 +9,7 @@ image="$1"
 output="$2"
 repository="ghcr.io/meneomic/eebus-bridge"
 issuer="https://token.actions.githubusercontent.com"
-identity="https://github.com/meneomic/eebus-ha-bridge-v940f/.github/workflows/vaillant-preview-image.yml@refs/heads/feat/vaillant-rc-preview"
+identity="https://github.com/meneomic/eebus-ha-bridge-v940f/.github/workflows/vaillant-preview-image.yml@refs/heads/release/vaillant-preview-0.18.2-rc1"
 
 case "$image" in
     "${repository}@sha256:"*) ;;

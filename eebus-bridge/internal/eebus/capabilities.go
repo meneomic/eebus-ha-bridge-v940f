@@ -181,14 +181,22 @@ func (r *DeviceRegistry) RecordCapabilitySupport(ski string, capability Capabili
 		return
 	}
 	disconnected := r.deviceDisconnected(ski)
-	if capability == CapabilityHeartbeat && advertised {
+	if advertised && (capability == CapabilityHeartbeat || capability == CapabilityMonitoring) {
 		r.health.mu.Lock()
 		// Empty scenario sets are also emitted during disconnect/re-discovery.
 		// Remember observed support until explicit device removal so teardown
 		// cannot let cached reads mask a missing subscription after reconnect.
-		r.health.heartbeatRequired[ski] = true
+		if capability == CapabilityHeartbeat {
+			r.health.heartbeatRequired[ski] = true
+		} else {
+			r.health.monitoringAdvertised[ski] = true
+		}
 		if state, known := r.health.monitoring[ski]; known {
-			state.heartbeatRequired = true
+			if capability == CapabilityHeartbeat {
+				state.heartbeatRequired = true
+			} else {
+				state.monitoringAdvertised = true
+			}
 			r.health.monitoring[ski] = state
 		}
 		r.health.mu.Unlock()
@@ -214,6 +222,17 @@ func (r *DeviceRegistry) RecordCapabilitySourceSupport(
 		return
 	}
 	disconnected := r.deviceDisconnected(ski)
+	// Preserve required monitoring evidence across SPINE teardown callbacks
+	// just as we preserve the heartbeat requirement.
+	if capability == CapabilityMonitoring && advertised {
+		r.health.mu.Lock()
+		r.health.monitoringAdvertised[ski] = true
+		if state, known := r.health.monitoring[ski]; known {
+			state.monitoringAdvertised = true
+			r.health.monitoring[ski] = state
+		}
+		r.health.mu.Unlock()
+	}
 	r.capabilities.mu.Lock()
 	defer r.capabilities.mu.Unlock()
 	byCapability, ok := r.capabilities.support[ski]
