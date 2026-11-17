@@ -44,11 +44,11 @@ from .generated.eebus.v1.device_service_pb2 import (
     ServiceStatus,
     SnapshotFieldId,
     SnapshotFieldStatus,
+    SnapshotReadDiagnostics,
+    SnapshotValueState,
     SpineEntityDiagnostics,
     SpineFunctionDiagnostics,
     SpineInventoryDiagnostics,
-    SnapshotReadDiagnostics,
-    SnapshotValueState,
 )
 from .generated.eebus.v1.device_service_pb2_grpc import DeviceServiceStub
 from .generated.eebus.v1.dhw_service_pb2 import (
@@ -222,11 +222,11 @@ __all__ = [
     "SetRoomHeatingTemperatureRequest",
     "SnapshotFieldId",
     "SnapshotFieldStatus",
+    "SnapshotReadDiagnostics",
+    "SnapshotValueState",
     "SpineEntityDiagnostics",
     "SpineFunctionDiagnostics",
     "SpineInventoryDiagnostics",
-    "SnapshotReadDiagnostics",
-    "SnapshotValueState",
     "VisualizationServiceStub",
     "WriteFailsafeLimitRequest",
     "WriteLoadLimitRequest",
