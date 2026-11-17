@@ -107,6 +107,7 @@ var implementedFeatures = []pb.FeatureId{
 	pb.FeatureId_FEATURE_DEVICE_SNAPSHOT,
 	pb.FeatureId_FEATURE_TYPED_MEASUREMENTS,
 	pb.FeatureId_FEATURE_OPERATIONAL_DIAGNOSTICS,
+	pb.FeatureId_FEATURE_SPINE_READONLY_INVENTORY,
 }
 
 func WithServerInfo(info *pb.ServerInfo) DeviceServiceOption {
@@ -248,6 +249,7 @@ func (s *DeviceService) GetDeviceDiagnostics(_ context.Context, req *pb.DeviceRe
 	if s.providers != nil {
 		result.Providers = s.providers.ProviderDiagnostics(now)
 	}
+	result.SpineInventory = spineInventoryDiagnostics(s.registry, ski)
 	return result, nil
 }
 
