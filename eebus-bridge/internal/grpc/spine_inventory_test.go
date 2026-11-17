@@ -8,7 +8,7 @@ import (
 )
 
 func TestSpineInventoryAllowlistAndRedaction(t *testing.T) {
-	zone := model.DeviceClassificationStringType("Rdc")
+	zone := model.LabelType("Rdc")
 	label := &model.DeviceClassificationUserDataType{UserLabel: &zone}
 	payload, allowed := safeSpineCachedPayload("HeatingZone", "DeviceClassification", model.FunctionTypeDeviceClassificationUserData, label)
 	if !allowed {
@@ -36,7 +36,7 @@ func TestSpineInventoryReadOnlyCategories(t *testing.T) {
 		{"Measurement", model.FunctionTypeMeasurementListData},
 		{"Measurement", model.FunctionTypeMeasurementConstraintsListData},
 		{"Setpoint", model.FunctionTypeSetpointListData},
-		{"HVAC", model.FunctionTypeHvacSystemFunctionSetpointRelationListData},
+		{"HVAC", model.FunctionTypeHvacSystemFunctionSetPointRelationListData},
 	}
 	for _, item := range allowed {
 		data := map[string]any{"id": 7, "unit": "degC", "value": 19.0}

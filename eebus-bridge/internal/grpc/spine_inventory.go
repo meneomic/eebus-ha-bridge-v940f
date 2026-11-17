@@ -142,7 +142,7 @@ func safeSpineCachedPayload(entityType, featureType string, name model.FunctionT
 		return data, strings.HasPrefix(string(name), "measurement")
 	case string(model.FeatureTypeTypeSetpoint):
 		return data, strings.HasPrefix(string(name), "setpoint")
-	case string(model.FeatureTypeTypeHVAC):
+	case string(model.FeatureTypeTypeHvac):
 		return data, strings.HasPrefix(string(name), "hvac")
 	case string(model.FeatureTypeTypeDeviceClassification):
 		if name != model.FunctionTypeDeviceClassificationUserData {
@@ -152,7 +152,7 @@ func safeSpineCachedPayload(entityType, featureType string, name model.FunctionT
 		// values alongside labels. Extract ONLY the heating-area name.
 		if entityType != string(model.EntityTypeTypeHeatingZone) &&
 			entityType != string(model.EntityTypeTypeHeatingCircuit) &&
-			entityType != string(model.EntityTypeTypeHVACRoom) {
+			entityType != string(model.EntityTypeTypeHvacRoom) {
 			return nil, false
 		}
 		value, ok := data.(*model.DeviceClassificationUserDataType)
