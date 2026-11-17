@@ -1,0 +1,122 @@
+# Integration-candidate CI. No tags, releases, Supervisor actions or production branch pushes.
+name: Vaillant Preview 0.18.2 RC1 integration checks (no deploy)
+on:
+  push:
+    branches:
+      - release/vaillant-preview-0.18.2-rc1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  go:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eebus-bridge
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+          cache-dependency-path: eebus-bridge/go.sum
+      - name: Go vet
+        run: go vet ./...
+      - name: Go tests with concurrency checking
+        run: go test -count=1 -race ./internal/eebus/... ./internal/grpc/... ./cmd/eebus-bridge/...
+      - name: Full Go suite
+        run: go test -count=1 ./...
+      - name: Compile standalone AMD64 binary (not deployed)
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o dist/eebus-bridge ./cmd/eebus-bridge
+          test -s dist/eebus-bridge
+          (cd dist && sha256sum eebus-bridge > SHA256SUMS)
+      - name: Upload binary for offline review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vaillant-preview-0.18.2-rc1-amd64-binary
+          path: |
+            eebus-bridge/dist/eebus-bridge
+            eebus-bridge/dist/SHA256SUMS
+          retention-days: 7
+  python:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.14', '3.15']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install checks
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-asyncio pytest-cov ruff mypy grpc-stubs "homeassistant>=2026.11.0" voluptuous grpcio protobuf
+      - name: Ruff
+        run: ruff check custom_components/
+      - name: Mypy strict
+        run: mypy custom_components/eebus
+      - name: Full Python suite except cross-language harness
+        run: PYTHONPATH=. pytest -m 'not cross_language' -q
+  cross-language:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+          cache-dependency-path: eebus-bridge/go.sum
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - run: python -m pip install pytest pytest-asyncio "homeassistant>=2026.11.0" voluptuous grpcio protobuf
+      - name: Cross-language gRPC contract
+        run: PYTHONPATH=. pytest -m cross_language -v custom_components/eebus/tests/test_cross_language_contract.py
+  package:
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f'
+    needs: [go, python, cross-language]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Existing standard add-on version policy stays unchanged
+        run: python3 scripts/check_addon_version.py
+      - name: Test identity-preserving importer
+        run: python3 -m unittest scripts.tests.test_vaillant_backup_import -v
+      - name: Verify proto stub exports
+        run: PYTHONPATH=. python3 scripts/check_proto_stubs_exports.py
+      - name: Package Python integration with no credentials or tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+          out = Path('eebus-ha-integration-vaillant-0.18.2-rc1.zip')
+          root = Path('custom_components/eebus')
+          with ZipFile(out, 'w', compression=ZIP_DEFLATED) as z:
+              for p in sorted(root.rglob('*')):
+                  if not p.is_file() or 'tests' in p.parts or '__pycache__' in p.parts or p.suffix == '.pyc':
+                      continue
+                  z.write(p, arcname=str(p))
+          assert out.stat().st_size > 10000
+          PY
+          sha256sum eebus-ha-integration-vaillant-0.18.2-rc1.zip > SHA256SUMS-integration
+      - name: Upload integration candidate (not installed)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vaillant-preview-0.18.2-rc1-ha-integration
+          path: |
+            eebus-ha-integration-vaillant-0.18.2-rc1.zip
+            SHA256SUMS-integration
+          retention-days: 7
