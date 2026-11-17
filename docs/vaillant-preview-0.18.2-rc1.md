@@ -31,8 +31,8 @@ indisponibilité définitive.
 
 ## Versions sans altérer l'add-on standard
 
-- Add-on **Vaillant Preview** cible : `0.18.2` (candidat, pin digest OCI
-  signé obligatoire avant bascule en version installable).
+- Add-on **Vaillant Preview** cible : `0.18.2` (candidat, digest OCI
+  signé et figé, non déployé).
 - Add-on standard : `0.18.0` **inchangé**.
 - `custom_components/eebus/manifest.json` : `0.18.0` pour préserver
   la politique de version standard. Les fichiers Python du candidat sont
@@ -64,3 +64,26 @@ indisponibilité définitive.
    réinstaller l'add-on standard en parallèle.
 
 Aucune étape de ce document n'autorise un déploiement automatique.
+
+## Image figée et signature vérifiée
+
+Image du build RC initial (`5135d4a99cdeacecfc617ab69024f4a108606850`) :
+
+`ghcr.io/meneomic/eebus-bridge@sha256:3e42d9b852c9202cf9a9eac44ca4f4ef8dc315cf4a9946e2de7a734a33f1920c`
+
+Workflow image : https://github.com/meneomic/eebus-ha-bridge-v940f/actions/runs/44097232470
+(Go Docker AMD64, smoke, publication OCI, signature keyless Cosign, vérification
+de l'identité/empreinte : tous réussis).
+
+Identité Cosign acceptée **uniquement** pour ce RC :
+`https://github.com/meneomic/eebus-ha-bridge-v940f/.github/workflows/vaillant-preview-image.yml@refs/heads/release/vaillant-preview-0.18.2-rc1`.
+
+Le même digest est épinglé dans le Dockerfile Preview ; le script
+`fetch-verified-preview.sh` vérifie l'identité exacte du signataire avant
+toute extraction. Le binaire ne contient ni clé privée ni identifiant
+d'appairage de l'utilisateur. **Ne pas modifier les pin/identités sans
+reconstruire et revalider le paquet.**
+
+La branche `feat/vaillant-rc-preview` sert toujours la Preview 0.18.1 ;
+ce RC ne devient une mise à jour Supervisor qu'après une bascule explicite
+de la branche distribuée. Pas de tag `v*` ni release HACS.
