@@ -229,3 +229,97 @@ async def test_stop_awaits_cancelled_tasks() -> None:
 
     assert unwound is True
     assert manager._tasks == []
+
+
+async def test_unexpected_worker_cancellation_restarts_with_backoff() -> None:
+    """External cancellation must not strand a device stream until integration reload."""
+    hass = _TaskCreatingHass()
+    channel_manager = MagicMock()
+    channel_manager.ensure_channel = AsyncMock(return_value=MagicMock())
+
+    async def fast_sleep(_delay: float) -> None:
+        await asyncio.sleep(0)
+
+    manager = StreamManager(
+        hass, channel_manager, sleep=fast_sleep, jitter=lambda _a, _b: 0.0
+    )  # type: ignore[arg-type]
+    first = asyncio.Event()
+    resumed = asyncio.Event()
+    count = 0
+
+    async def consume(_channel: grpc.aio.Channel) -> None:
+        nonlocal count
+        count += 1
+        (first if count == 1 else resumed).set()
+        await asyncio.Event().wait()
+
+    manager.start({"device_state": consume}, "eebus_{name}_test-ski")
+    await asyncio.wait_for(first.wait(), timeout=1)
+
+    manager._tasks[0].cancel()  # Simulate a cancellation outside StreamManager.stop
+    await asyncio.wait_for(resumed.wait(), timeout=1)
+
+    diagnostics = manager.diagnostics()
+    assert diagnostics.configured == 1
+    assert diagnostics.running == 1
+    assert diagnostics.done == 0
+    assert diagnostics.reconnects == 1
+    assert channel_manager.ensure_channel.await_count == 2
+    await manager.stop()
+
+
+async def test_stop_cancels_pending_restart_without_resurrecting_worker() -> None:
+    """An integration unload must never leave a delayed restart behind."""
+    hass = _TaskCreatingHass()
+    channel_manager = MagicMock()
+    channel_manager.ensure_channel = AsyncMock(return_value=MagicMock())
+    backoff_started = asyncio.Event()
+
+    async def stalled_backoff(_delay: float) -> None:
+        backoff_started.set()
+        await asyncio.Event().wait()
+
+    manager = StreamManager(
+        hass, channel_manager, sleep=stalled_backoff, jitter=lambda _a, _b: 0.0
+    )  # type: ignore[arg-type]
+    entered = asyncio.Event()
+
+    async def consume(_channel: grpc.aio.Channel) -> None:
+        entered.set()
+        await asyncio.Event().wait()
+
+    manager.start({"device_state": consume}, "eebus_{name}_test-ski")
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    manager._tasks[0].cancel()
+    await asyncio.wait_for(backoff_started.wait(), timeout=1)
+    await manager.stop()
+    await asyncio.sleep(0)
+
+    assert manager.diagnostics().configured == 0
+    assert not manager._restart_tasks
+    assert hass.task_names.count("eebus_device_state_test-ski") == 1
+
+
+async def test_unimplemented_exit_is_not_restarted() -> None:
+    """UNIMPLEMENTED must exit once and let the legacy fallback take over."""
+    hass = _TaskCreatingHass()
+    channel_manager = MagicMock()
+    channel_manager.ensure_channel = AsyncMock(return_value=MagicMock())
+    manager = StreamManager(hass, channel_manager)  # type: ignore[arg-type]
+    fallback = MagicMock()
+    consume = AsyncMock(side_effect=_rpc_error(grpc.StatusCode.UNIMPLEMENTED))
+
+    manager.start(
+        {"device_state": consume},
+        "eebus_{name}_test-ski",
+        on_unimplemented=fallback,
+    )
+    await asyncio.wait_for(manager._tasks[0], timeout=1)
+    await asyncio.sleep(0)
+
+    fallback.assert_called_once_with("device_state")
+    consume.assert_awaited_once()
+    assert manager.diagnostics().done == 1
+    assert manager.diagnostics().reconnects == 0
+    assert not manager._restart_tasks
+    await manager.stop()

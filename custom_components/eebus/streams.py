@@ -40,6 +40,10 @@ class StreamManager:
         self._sleep = sleep
         self._jitter = jitter
         self._tasks: list[asyncio.Task[None]] = []
+        self._restart_tasks: set[asyncio.Task[None]] = set()
+        self._restart_attempts: dict[str, int] = {}
+        self._unsupported: set[str] = set()
+        self._stopping = False
         self._reconnects = 0
 
     def start(
@@ -51,20 +55,117 @@ class StreamManager:
         """Launch one background task per named stream, unless already started."""
         if self._tasks:
             return
+        self._stopping = False
+        self._unsupported.clear()
+        self._restart_attempts.clear()
         for name, consume in streams.items():
-            self._tasks.append(
-                self._hass.async_create_background_task(
-                    self._run_stream(name, consume, on_unimplemented),
-                    name=task_name_prefix.format(name, name=name),
-                )
+            self._launch(name, consume, task_name_prefix, on_unimplemented)
+
+    def _launch(
+        self,
+        name: str,
+        consume: ConsumeFn,
+        task_name_prefix: str,
+        on_unimplemented: UnsupportedFn | None,
+        slot: int | None = None,
+    ) -> None:
+        """Attach a guarded task, retaining its stable diagnostic slot."""
+        task = self._hass.async_create_background_task(
+            self._run_stream(name, consume, on_unimplemented),
+            name=task_name_prefix.format(name, name=name),
+        )
+        if slot is None:
+            slot = len(self._tasks)
+            self._tasks.append(task)
+        else:
+            self._tasks[slot] = task
+        task.add_done_callback(
+            lambda done: self._on_stream_done(
+                done, slot, name, consume, task_name_prefix, on_unimplemented
             )
+        )
+
+    def _on_stream_done(
+        self,
+        task: asyncio.Task[None],
+        slot: int,
+        name: str,
+        consume: ConsumeFn,
+        task_name_prefix: str,
+        on_unimplemented: UnsupportedFn | None,
+    ) -> None:
+        """Recover a worker that escaped its normal retry loop.
+
+        UNIMPLEMENTED is an intentional exit with legacy fallback. All other
+        terminal exits are unexpected; a delayed retry avoids a hot loop.
+        """
+        if (
+            self._stopping
+            or slot >= len(self._tasks)
+            or self._tasks[slot] is not task
+            or name in self._unsupported
+        ):
+            return
+
+        if task.cancelled():
+            _LOGGER.warning("EEBUS %s stream unexpectedly cancelled; restarting", name)
+        elif (error := task.exception()) is not None:
+            _LOGGER.error(
+                "EEBUS %s stream terminated unexpectedly; restarting",
+                name,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+        else:
+            _LOGGER.warning("EEBUS %s stream ended unexpectedly; restarting", name)
+
+        self._reconnects += 1
+        attempt = self._restart_attempts.get(name, 0) + 1
+        self._restart_attempts[name] = attempt
+        delay = min(
+            STREAM_BACKOFF_BASE_SECONDS * (2 ** min(attempt - 1, 6)),
+            STREAM_BACKOFF_MAX_SECONDS,
+        ) + self._jitter(0, STREAM_BACKOFF_JITTER_SECONDS)
+        restart = self._hass.async_create_background_task(
+            self._restart_after_exit(
+                task, slot, name, consume, task_name_prefix, on_unimplemented, delay
+            ),
+            name=f"{task_name_prefix.format(name, name=name)}_restart",
+        )
+        self._restart_tasks.add(restart)
+        restart.add_done_callback(self._restart_tasks.discard)
+
+    async def _restart_after_exit(
+        self,
+        previous: asyncio.Task[None],
+        slot: int,
+        name: str,
+        consume: ConsumeFn,
+        task_name_prefix: str,
+        on_unimplemented: UnsupportedFn | None,
+        delay: float,
+    ) -> None:
+        await self._sleep(delay)
+        if (
+            not self._stopping
+            and slot < len(self._tasks)
+            and self._tasks[slot] is previous
+        ):
+            self._launch(name, consume, task_name_prefix, on_unimplemented, slot)
 
     async def stop(self) -> None:
-        """Cancel every stream task and await completion before returning."""
+        """Cancel workers and pending restarts, including during profile swaps."""
+        self._stopping = True
+        for task in tuple(self._restart_tasks):
+            task.cancel()
         for task in self._tasks:
             task.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        await asyncio.gather(
+            *self._restart_tasks, *self._tasks, return_exceptions=True
+        )
         self._tasks.clear()
+        self._restart_tasks.clear()
+        self._restart_attempts.clear()
+        self._unsupported.clear()
 
     def diagnostics(self) -> StreamWorkerDiagnostics:
         """Return non-secret stream lifecycle counters for diagnostics."""
@@ -98,6 +199,7 @@ class StreamManager:
                     )
                     if on_unimplemented is not None:
                         on_unimplemented(name)
+                    self._unsupported.add(name)
                     return
                 attempt += 1
                 self._reconnects += 1

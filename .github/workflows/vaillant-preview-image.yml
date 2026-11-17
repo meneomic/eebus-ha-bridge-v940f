@@ -5,7 +5,7 @@ name: Vaillant preview image (not deployed)
 on:
   push:
     branches:
-      - feat/vaillant-rc-preview
+      - release/vaillant-preview-0.18.2-rc1
     paths:
       - 'eebus-bridge/**'
       - 'scripts/smoke-image.sh'
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   image-amd64:
-    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/feat/vaillant-rc-preview'
+    if: github.repository == 'meneomic/eebus-ha-bridge-v940f' && github.ref == 'refs/heads/release/vaillant-preview-0.18.2-rc1'
     runs-on: ubuntu-latest
     permissions:
       contents: read
