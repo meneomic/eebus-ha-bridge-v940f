@@ -18,20 +18,26 @@ func TestSpineInventoryAllowlistAndRedaction(t *testing.T) {
 	if got["user_label"] != "Rdc" || len(got) != 1 {
 		t.Fatalf("unexpected non-minimal label payload: %+v", payload)
 	}
-	for _, test := range []struct{ entity, feature string; function model.FunctionType }{
+	for _, test := range []struct {
+		entity, feature string
+		function        model.FunctionType
+	}{
 		{"DeviceInformation", "DeviceClassification", model.FunctionTypeDeviceClassificationManufacturerData},
 		{"HeatingZone", "DeviceClassification", model.FunctionTypeDeviceClassificationManufacturerData},
 		{"DeviceInformation", "NodeManagement", model.FunctionTypeNodeManagementDetailedDiscoveryData},
 		{"Generic", "Generic", model.FunctionTypeDeviceClassificationUserData},
 	} {
-		if _, ok := safeSpineCachedPayload(test.entity, test.feature, test.function, map[string]string{"secret":"private"}); ok {
+		if _, ok := safeSpineCachedPayload(test.entity, test.feature, test.function, map[string]string{"secret": "private"}); ok {
 			t.Fatalf("sensitive payload not filtered: %+v", test)
 		}
 	}
 }
 
 func TestSpineInventoryReadOnlyCategories(t *testing.T) {
-	allowed := []struct{ feature string; function model.FunctionType }{
+	allowed := []struct {
+		feature  string
+		function model.FunctionType
+	}{
 		{"Measurement", model.FunctionTypeMeasurementDescriptionListData},
 		{"Measurement", model.FunctionTypeMeasurementListData},
 		{"Measurement", model.FunctionTypeMeasurementConstraintsListData},

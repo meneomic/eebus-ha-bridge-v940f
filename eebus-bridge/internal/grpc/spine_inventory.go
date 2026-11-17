@@ -52,7 +52,7 @@ func spineInventoryDiagnostics(registry *eebus.DeviceRegistry, ski string) *pb.S
 			break
 		}
 		entry := &pb.SpineEntityDiagnostics{
-			Address: spineEntityAddress(entity.Address()),
+			Address:    spineEntityAddress(entity.Address()),
 			EntityType: string(entity.EntityType()),
 		}
 		for _, feature := range entity.Features() {
@@ -75,12 +75,12 @@ func spineInventoryDiagnostics(registry *eebus.DeviceRegistry, ski string) *pb.S
 				}
 				record := &pb.SpineFunctionDiagnostics{
 					FeatureAddress: spineFeatureAddress(feature.Address()),
-					FeatureType: string(feature.Type()),
-					FunctionName: string(name),
-					Readable: op.Read(),
-					ReadPartial: op.ReadPartial(),
-					Writable: op.Write(),
-					WritePartial: op.WritePartial(),
+					FeatureType:    string(feature.Type()),
+					FunctionName:   string(name),
+					Readable:       op.Read(),
+					ReadPartial:    op.ReadPartial(),
+					Writable:       op.Write(),
+					WritePartial:   op.WritePartial(),
 				}
 				record.CacheState, record.CachedJson = spineCachedFunction(
 					entry.EntityType, record.FeatureType, name, record.Readable || record.ReadPartial,
